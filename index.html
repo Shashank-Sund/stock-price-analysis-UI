@@ -25,7 +25,7 @@
         /* Style the input fields and labels */
         .input-group {
             margin-bottom: 15px;
-            text-align: left;
+            text-align: center;
         }
 
         label {
@@ -35,12 +35,13 @@
         }
 
         input[type="text"] {
-            width: 100%;
+            width: 10%;
             padding: 10px;
             font-size: 16px;
             border: 1px solid #ccc;
             border-radius: 5px;
             outline: none;
+            text-align: center;
         }
 
         /* Style the button */
@@ -74,7 +75,9 @@
 </head>
 <body>
     <div class="container">
+        <br>
         <h1>Stock Price Analysis</h1>
+        <br>
         <div class="input-group">
             <label for="input1">Start Date:</label>
             <input type="text" id="input1" name="input1" placeholder="YYYY-MM-DD">
@@ -87,7 +90,8 @@
             <label for="input3">Symbol:</label>
             <input type="text" id="input3" name="input3" placeholder="Ex: BTC/USD">
         </div>
-        <button id="apiButton">Conduct Analysis</button>
+        <br>
+        <button id="apiButton">Analyze</button>
         <div id="response" class="response-container"></div>
     </div>
     
