@@ -30,8 +30,12 @@
 
         h1 {
             font-size: 32px; /* Larger font size */
+            font-weight: 600;
+            background-image: radial-gradient(ellipse, #553c9a, #ee4b2b);
             margin-bottom: 20px;
-            color: #3498db; /* Change text color */
+            color: transparent; /* Change text color */
+            background-clip: text;
+            -webkit-background-clip: text;
             text-transform: uppercase; /* Uppercase text */
         }
 
@@ -57,7 +61,8 @@
             margin: 0 auto;
             padding: 10px 20px;
             font-size: 18px;
-            background-color: #3498db;
+            background-color: #553c9a;
+            background-image: radial-gradient(ellipse, #553c9a, #ee4b2b);
             color: #fff;
             border: none;
             border-radius: 5px;
@@ -84,7 +89,8 @@
     <div class="container">
         <br>
         <h1>Stock Price Analysis</h1>
-        <br>
+        <p> This tool is used to conduct Exploratory Data Analysis on historical stock price data of a given stock ticker, start date, and end date. 
+            These visualizations and plots can be used to derive insights on market price data using the scikit-learn library. </p>
         <div class="input-group">
             <label for="input1">Start Date:</label>
             <input type="text" id="input1" name="input1" placeholder="YYYY-MM-DD">
