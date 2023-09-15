@@ -3,6 +3,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const responseDiv = document.getElementById('response');
 
     apiButton.addEventListener('click', function() {
+
+        // Diable button and change text while process is running
+        apiButton.disabled = true;
+        apiButton.textContent = "Running...";
+
         // Define the API URL
         const apiUrl = 'https://mgpqvaaqhh.execute-api.us-east-1.amazonaws.com/Prod'; // Replace with your API endpoint
 
@@ -35,5 +40,11 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             responseDiv.textContent = 'An error occurred while sending the request.';
         });
+
+        setTimeout(function () {
+            // Re-enable the button and restore the original text
+            apiButton.disabled = false;
+            apiButton.textContent = "Analyze";
+        }, 5000); // Simulated 3-second process; replace with your actual process duration
     });
 });
