@@ -1,6 +1,8 @@
 # stock-price-analysis-UI
 
-This tool collects, cleans, and visualizes historical market price data through an API for Exploratory Data Analysis
+https://shaismarketpriceeda.com/
+
+This tool collects, cleans, and visualizes historical market price data through an API for Exploratory Data Analysis. Please visit https://github.com/Shashank-Sund/docker-lambda-aws3 to learn more.
 
 # Architecture
 
