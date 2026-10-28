@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceArea, ReferenceLine, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, colorVar, type ChartConfig } from '@/components/ui/chart';
 import { useReducedMotion } from '@/hooks/useMedia';
-import { dateToMs, formatDate, formatPercent, formatSignedPercent } from '@/lib/format';
+import { dateToMs, formatDate, formatPercent, formatSignedPercent, formatTickPercent } from '@/lib/format';
 import { HINTS } from '@/lib/hints';
 import { timeRows, type TimePoint } from '@/lib/transforms';
 import { drawdownSummary, volatilitySummary } from '@/lib/summaries';
@@ -34,8 +34,6 @@ export default function RiskTab({ ticker, style, interval }: TabProps & { interv
   const trough = s.max_drawdown_trough ? dateToMs(s.max_drawdown_trough) : null;
   const hasVol = rows.some((r) => r.vol !== null);
   const x = timeAxis(rows);
-  // Small drawdowns need a decimal on the axis so ticks do not repeat.
-  const ddDigits = (s.max_drawdown ?? 0) > -0.1 ? 1 : 0;
   const tip = tooltipDate(interval);
 
   return (
@@ -67,7 +65,7 @@ export default function RiskTab({ ticker, style, interval }: TabProps & { interv
               </defs>
               <CartesianGrid vertical={false} />
               <XAxis {...x} />
-              <YAxis {...yAxisBase} width={44} tickFormatter={(v: number) => formatPercent(v, 0)} domain={[0, 'auto']} />
+              <YAxis {...yAxisBase} width={44} tickFormatter={formatTickPercent} domain={[0, 'auto']} />
               <ChartTooltip content={<ChartTooltipContent labelFormatter={tip} formatter={(v) => formatPercent(v, 1)} />} />
               {s.annual_volatility !== null && (
                 <ReferenceLine y={s.annual_volatility} strokeOpacity={0.7} strokeDasharray="4 3" />
@@ -110,7 +108,7 @@ export default function RiskTab({ ticker, style, interval }: TabProps & { interv
             </defs>
             <CartesianGrid vertical={false} />
             <XAxis {...x} />
-            <YAxis {...yAxisBase} width={48} tickFormatter={(v: number) => formatPercent(v, ddDigits)} domain={['auto', 0]} />
+            <YAxis {...yAxisBase} width={48} tickFormatter={formatTickPercent} domain={['auto', 0]} />
             <ChartTooltip content={<ChartTooltipContent labelFormatter={tip} formatter={(v) => formatSignedPercent(v)} />} />
             {peak !== null && trough !== null && (
               <ReferenceArea
