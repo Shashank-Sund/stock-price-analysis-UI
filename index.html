@@ -1,119 +1,38 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Request Example</title>
-    <style>
-        /* Reset some default styles */
-        body, h1 {
-            margin: 0;
-            padding: 0;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stock Price Analysis</title>
+    <meta
+      name="description"
+      content="Exploratory data analysis of historical stock prices: closing price, correlation, distribution, daily returns and more."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#18181b" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Apply the theme before first paint to avoid a flash of the wrong theme.
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem('spa.theme');
+        } catch (e) {}
+        if (t !== 'light' && t !== 'dark') {
+          try {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          } catch (e) {
+            t = 'light';
+          }
         }
-
-        /* Style the container for the form */
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            text-align: center;
-            background-color: #f5f5f5;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Style the input fields and labels */
-        .input-group {
-            margin-bottom: 15px;
-            text-align: center;
-        }
-
-        h1 {
-            font-size: 32px; /* Larger font size */
-            font-weight: 600;
-            background-image: radial-gradient(ellipse, #553c9a, #ee4b2b);
-            margin-bottom: 20px;
-            color: transparent; /* Change text color */
-            background-clip: text;
-            -webkit-background-clip: text;
-            text-transform: uppercase; /* Uppercase text */
-        }
-
-        label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        input[type="text"] {
-            width: 10%;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            outline: none;
-            text-align: center;
-        }
-
-        /* Style the button */
-        #apiButton {
-            display: block;
-            margin: 0 auto;
-            padding: 10px 20px;
-            font-size: 18px;
-            background-color: #553c9a;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        #apiButton:hover {
-            background-color: #c1c7cc;
-        }
-
-        /* Style the response container for HTML content */
-        .response-container {
-            margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background-color: #fff;
-            overflow: auto;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <br>
-        <h1>Stock Price Analysis</h1>
-        <p> This tool is used to conduct Exploratory Data Analysis on historical stock price data of a given stock ticker, start date, and end date. 
-            These visualizations and plots can be used to derive insights on market price data using the scikit-learn library. To view an analysis for
-            a single stock, simply input the ticker in the 'symbol' field with no spaces. To analyze multiple stocks, please add add the ticker symbols
-            in the 'symbol' field with no spaces and commas between each ticker.</p>
-        <div class="input-group">
-            <label for="input1">Start Date:</label>
-            <input type="date" id="input1" name="input1" placeholder="YYYY-MM-DD">
-        </div>
-        <div class="input-group">
-            <label for="input2">End Date:</label>
-            <input type="date" id="input2" name="input2" placeholder="YYYY-MM-DD">
-        </div>
-        <div class="input-group">
-            <label for="input3">Symbol:</label>
-            <input type="text" id="input3" name="input3" placeholder="Ex: AAPL,GOOG,etc.">
-        </div>
-        <br>
-        <button id="apiButton">Analyze</button>
-        <div id="response" class="response-container"></div>
-        <br>
-        <footer><a href="https://github.com/Shashank-Sund/stock-price-analysis-UI">Front-End Code</a></footer>
-        <footer><a href="https://github.com/Shashank-Sund/docker-lambda-aws3">Back-End Code</a></footer>
-        <br>
-        <footer>A Shashank Sundararaman Production</footer>
-    </div>
-    
-    <script src="script.js"></script>
-</body>
+        if (t === 'dark') document.documentElement.classList.add('dark');
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>This app needs JavaScript to run.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
