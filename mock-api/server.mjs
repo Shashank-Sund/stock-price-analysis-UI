@@ -18,12 +18,22 @@
  *   HTTP500  HTTP 500 with {"message": "Internal server error"}
  * Anything else succeeds: one ticker returns up to 5 charts, several return 1.
  *
+ * JSON mode: a body with "format": "json" gets the chart data response (docs/json-api.md in
+ * the backend repo) in the Lambda envelope {"statusCode", "headers", "body": "<JSON string>"}.
+ * A request that matches one of the real backend responses in ./fixtures/backend (same
+ * dates, same tickers in any order) gets that file byte for byte. Anything else is built by
+ * ./synth.mjs from simulated prices (MOCK_SOURCE=synth forces that). Unknown tickers (QX...,
+ * ZZ..., ERR, XYZ, FAKE, NOPE) get the backend's "No data found" error, and the 10 ticker
+ * and 20 year limits are enforced. SLOW, HANG, CRASH and HTTP500 work as above; BADJSON
+ * answers with HTML (an unreadable response) and NOSPY simulates a failed benchmark download.
+ *
  * Usage: npm run mock-api   (PORT=8787, MOCK_DELAY_MS=1200 by default)
  */
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { handleJson } from './synth.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8787);
@@ -39,6 +49,20 @@ const FIXTURES = {
   returns: { title: 'Daily Returns', b64: png('returns') },
   multi: { title: 'Closing Stock Price of Multiple Companies Over Time', b64: png('multi') },
 };
+
+const SOURCE = process.env.MOCK_SOURCE === 'synth' ? 'synth' : 'auto';
+
+/** Real backend responses keyed by "start|end|tickers, sorted". */
+const fixtureKey = (start, end, tickers) => `${start}|${end}|${[...new Set(tickers)].sort().join(',')}`;
+const BACKEND = new Map();
+for (const file of readdirSync(join(here, 'fixtures', 'backend')).filter((f) => f.endsWith('.json'))) {
+  const text = readFileSync(join(here, 'fixtures', 'backend', file), 'utf8').trim();
+  const body = JSON.parse(JSON.parse(text).body);
+  if (body.tickers) BACKEND.set(fixtureKey(body.start_date, body.end_date, body.tickers), { file, text });
+}
+// The unknown ticker fixture has no tickers in its body; key it by its request.
+const unknown = readFileSync(join(here, 'fixtures', 'backend', 'error-unknown.json'), 'utf8').trim();
+BACKEND.set(fixtureKey('2025-10-28', '2026-10-28', ['QXZQZ']), { file: 'error-unknown.json', text: unknown });
 
 const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/</g, '&lt;');
 const escapeText = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -63,6 +87,11 @@ function charts(tickers, start, end, withAlt) {
   const list = [FIXTURES.closing, ...(spansYears ? [FIXTURES.yearly] : []), FIXTURES.correlation, FIXTURES.distribution, FIXTURES.returns];
   return page(list.map((f) => img(f, withAlt)).join(''));
 }
+
+const localToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -106,6 +135,7 @@ const server = createServer(async (req, res) => {
     .map((t) => t.trim().toUpperCase())
     .filter(Boolean);
   const has = (t) => tickers.includes(t);
+  const json = payload.format === 'json';
   console.log(`[mock-api] ${new Date().toISOString()} ${start} to ${end} symbol=${tickers.join(',') || '(none)'}`);
 
   if (has('HANG')) {
@@ -115,6 +145,27 @@ const server = createServer(async (req, res) => {
   }
 
   await sleep(has('SLOW') ? 5000 : DELAY_MS);
+
+  if (json && !has('CRASH') && !has('HTTP500')) {
+    if (has('BADJSON')) {
+      send(res, 200, '<!DOCTYPE html><html><body><p>Not what you expected</p></body></html>');
+      return;
+    }
+    const scenario = new Set(['SLOW', 'NOSPY']);
+    const real = SOURCE === 'auto' ? BACKEND.get(fixtureKey(start, end, tickers.filter((t) => !scenario.has(t)))) : null;
+    if (real && !has('NOSPY')) {
+      console.log(`[mock-api]   served fixtures/backend/${real.file}`);
+      send(res, 200, real.text, 'application/json');
+      return;
+    }
+    const symbol = tickers.filter((t) => !scenario.has(t)).join(',') || (has('SLOW') ? 'AAPL' : '');
+    const result = handleJson(
+      { ...payload, symbol },
+      { today: localToday(), benchmarkAvailable: !has('NOSPY') },
+    );
+    send(res, 200, JSON.stringify(result), 'application/json');
+    return;
+  }
 
   if (has('CRASH')) {
     send(
@@ -139,5 +190,6 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`[mock-api] listening on http://localhost:${PORT} (delay ${DELAY_MS} ms, format ${FORMAT})`);
-  console.log('[mock-api] scenarios by ticker: ERR, CRASH, SLOW, HANG, NOALT, EMPTY, HTTP500');
+  console.log('[mock-api] scenarios by ticker: ERR, CRASH, SLOW, HANG, NOALT, EMPTY, HTTP500, BADJSON, NOSPY');
+  console.log(`[mock-api] JSON: ${SOURCE === 'auto' ? `${BACKEND.size} real backend responses, synthetic data otherwise` : 'synthetic data only'}`);
 });

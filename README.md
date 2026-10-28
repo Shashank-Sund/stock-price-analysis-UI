@@ -91,6 +91,36 @@ npm run mock-api                                   # terminal 1
 VITE_API_URL=http://localhost:8787 npm run dev     # terminal 2
 ```
 
+## Running against the local backend Lambda
+
+The backend Lambda runs locally in Docker under the Lambda runtime interface emulator on port 9000. Its invoke endpoint, `http://localhost:9000/2015-03-31/functions/function/invocations`, answers with the same envelope API Gateway sends. Vite's `server.proxy` and `preview.proxy` forward `POST /api` to it, so the browser talks to its own origin (no CORS):
+
+```sh
+# 1. Backend (in docker-lambda-aws3): build and run the image with port 9000 published.
+# 2. Front end:
+VITE_API_URL=/api npm run build
+npx vite preview            # http://localhost:4173, /api goes to localhost:9000
+```
+
+Set `API_PROXY_TARGET` to forward somewhere else, for example the mock API:
+
+```sh
+npm run mock-api                                            # terminal 1, port 8787
+VITE_API_URL=/api npm run build
+API_PROXY_TARGET=http://localhost:8787 npx vite preview     # terminal 2
+```
+
+`npm run dev` uses the same proxy. (On Node 20.6.0 the Vite dev server fails with Babel's "Cannot redefine property: File"; use build plus preview there.)
+
+## JSON mock data
+
+Requests with `"format": "json"` get chart data instead of PNGs (contract: `docs/json-api.md` in the backend repo). The mock answers them in two ways:
+
+- **Real backend responses.** `mock-api/fixtures/backend/` holds responses recorded from the real Lambda (copied from the backend repo's `docs/fixtures/`): AAPL 1Y, MSFT 5Y, NVDA 10Y (weekly bars), AMZN 1M, AAPL, MSFT and NVDA 1Y, TSLA and SPY 1Y, 10 tickers over 20 years (weekly, 1.3 MB) and an unknown ticker error. A request with the same dates and tickers gets the file byte for byte. The tests use these files too.
+- **Synthetic data** for any other request, built by `mock-api/synth.mjs` with the backend's definitions from a deterministic simulation (GARCH style volatility, betas against a market factor, a few stress episodes; not market data). It enforces the same 10 symbol and 20 year limits and uses weekly bars for ranges longer than 5 years. `MOCK_SOURCE=synth` always uses it.
+
+Scenario tickers: unknown tickers (`QX...`, `ZZ...`, `ERR`, `XYZ`, `FAKE`, `NOPE`) get the backend's "No data found" message, `SLOW` answers after 5 seconds, `HANG` never in time, `CRASH` with the old crash JSON, `HTTP500` with an HTTP 500, `BADJSON` with an unreadable HTML page and `NOSPY` simulates a failed benchmark download.
+
 ## Project layout
 
 ```
