@@ -15,11 +15,12 @@ describe('toJsonRequestBody', () => {
     });
   });
 
-  it('sends SPY when entered, unless it would exceed the backend limit of 10 symbols', () => {
+  it('sends tickers as typed, including SPY with 10 other tickers', () => {
     expect(toJsonRequestBody({ ...req, tickers: ['TSLA', 'SPY'] }).symbol).toBe('TSLA,SPY');
     expect(toJsonRequestBody({ ...req, tickers: ['SPY'] }).symbol).toBe('SPY');
     const ten = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
-    expect(toJsonRequestBody({ ...req, tickers: [...ten.slice(0, 5), 'SPY', ...ten.slice(5)] }).symbol).toBe(ten.join(','));
+    const typed = [...ten.slice(0, 5), 'SPY', ...ten.slice(5)];
+    expect(toJsonRequestBody({ ...req, tickers: typed }).symbol).toBe(typed.join(','));
   });
 });
 

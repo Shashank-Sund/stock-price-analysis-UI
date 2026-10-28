@@ -17,18 +17,12 @@ export const BENCHMARK = 'SPY';
 export const UNEXPECTED_MESSAGE =
   'The analysis service sent a response this page could not read. Please try again in a moment.';
 
-/** The backend accepts at most this many symbols, SPY included. */
-export const BACKEND_MAX_SYMBOLS = 10;
-
 /**
- * Builds the POST body. Tickers are sent as typed. SPY does not count toward the UI's
- * 10 ticker limit, but the backend counts every symbol; since it always adds SPY as the
- * benchmark anyway, SPY is left out only when sending it would exceed the backend limit.
+ * Builds the POST body: the original fields plus format json. Tickers are sent as typed;
+ * the backend does not count SPY toward its 10 ticker limit.
  */
 export function toJsonRequestBody(req: AnalysisRequest) {
-  const others = req.tickers.filter((t) => t !== BENCHMARK);
-  const symbols = req.tickers.length > BACKEND_MAX_SYMBOLS && others.length > 0 ? others : req.tickers;
-  return { start_date: req.startDate, end_date: req.endDate, symbol: symbols.join(','), format: 'json' as const };
+  return { start_date: req.startDate, end_date: req.endDate, symbol: req.tickers.join(','), format: 'json' as const };
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {
