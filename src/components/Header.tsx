@@ -7,7 +7,7 @@ export function Header({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: 
   const next = theme === 'dark' ? 'light' : 'dark';
   return (
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex min-h-16 max-w-6xl py-2.5 items-center gap-3 px-4 sm:px-6">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
           <ChartSpline className="size-5" aria-hidden="true" />
         </div>
@@ -15,7 +15,7 @@ export function Header({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: 
           <h1 className="truncate text-base font-semibold leading-tight tracking-tight sm:text-lg">
             Stock Price Analysis
           </h1>
-          <p className="truncate text-xs text-muted-foreground sm:text-sm">
+          <p className="text-xs leading-snug text-muted-foreground sm:truncate sm:text-sm">
             Exploratory data analysis of historical stock prices
           </p>
         </div>

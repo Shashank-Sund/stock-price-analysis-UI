@@ -21,8 +21,8 @@ export function ChartCard({ chart, wide, index, onOpen, onDownload }: ChartCardP
       className={cn('animate-enter min-w-0 overflow-hidden', wide && 'lg:col-span-2')}
       style={{ animationDelay: `${Math.min(index, 5) * 40}ms` }}
     >
-      <div className="flex items-center gap-2 border-b py-2 pr-2 pl-4">
-        <h3 className="min-w-0 flex-1 truncate text-sm font-medium" title={chart.title}>
+      <div className="flex min-h-[49px] items-center gap-2 border-b py-2 pr-2 pl-4">
+        <h3 className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug" title={chart.title}>
           {chart.title}
         </h3>
         <WithTooltip label="Download PNG">

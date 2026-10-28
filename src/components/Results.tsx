@@ -29,7 +29,7 @@ function QuerySummary({ q, trailing }: { q: AnalysisRequest; trailing: ReactNode
         ))}
       </div>
       <span className="text-sm text-muted-foreground tabular-nums">{rangeText(q)}</span>
-      <span className="ml-auto text-sm text-muted-foreground tabular-nums">{trailing}</span>
+      <span className="w-full text-sm text-muted-foreground tabular-nums sm:ml-auto sm:w-auto">{trailing}</span>
     </div>
   );
 }
@@ -65,7 +65,7 @@ export function Results({ state, onRetry, onExample }: ResultsProps) {
       </p>
 
       {status === 'idle' && (
-        <Card className="animate-fade items-center border-dashed px-6 py-14 text-center shadow-none sm:py-20">
+        <Card className="animate-fade items-center border-dashed px-6 py-12 text-center shadow-none sm:py-16">
           <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <ChartLine className="size-6" aria-hidden="true" />
           </div>
