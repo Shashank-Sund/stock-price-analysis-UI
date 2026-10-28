@@ -1,0 +1,150 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens follow the shadcn/ui CSS variable convention (MIT licensed,
+ * https://github.com/shadcn-ui/ui). Neutral zinc surfaces with a single
+ * restrained violet accent that nods to the original site's #553c9a.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.985 0.002 286);
+  --foreground: oklch(0.21 0.006 285.885);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.006 285.885);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.006 285.885);
+  --primary: oklch(0.47 0.16 287);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.955 0.002 286.375);
+  --muted-foreground: oklch(0.5 0.016 285.938);
+  --accent: oklch(0.955 0.012 287);
+  --accent-foreground: oklch(0.3 0.08 287);
+  --destructive: oklch(0.55 0.22 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.915 0.004 286.32);
+  --input: oklch(0.88 0.004 286.32);
+  --ring: oklch(0.55 0.16 287);
+  --figure: oklch(1 0 0);
+  --shadow-card: 0 1px 2px 0 oklch(0.2 0.01 286 / 0.05), 0 1px 3px 0 oklch(0.2 0.01 286 / 0.04);
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(0.16 0.005 285.823);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.2 0.006 285.885);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.22 0.006 285.885);
+  --popover-foreground: oklch(0.97 0 0);
+  --primary: oklch(0.74 0.13 287);
+  --primary-foreground: oklch(0.2 0.05 287);
+  --secondary: oklch(0.27 0.006 286.033);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.25 0.006 286.033);
+  --muted-foreground: oklch(0.72 0.015 286.067);
+  --accent: oklch(0.29 0.03 287);
+  --accent-foreground: oklch(0.92 0.04 287);
+  --destructive: oklch(0.7 0.19 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.68 0.13 287);
+  /* Charts are white matplotlib figures; keep them on a soft paper surface. */
+  --figure: oklch(0.96 0 0);
+  --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-figure: var(--figure);
+  --shadow-card: var(--shadow-card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Native date picker icon follows the theme. */
+  input[type='date']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+  }
+  .dark input[type='date']::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+}
+
+/* Motion: only animate when the user has not asked for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes enter-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes enter-rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @keyframes enter-zoom {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.97);
+    }
+  }
+  .animate-enter {
+    animation: enter-rise 260ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+  .animate-fade {
+    animation: enter-fade 200ms ease-out both;
+  }
+  .dialog-overlay[data-state='open'] {
+    animation: enter-fade 160ms ease-out;
+  }
+  .dialog-content[data-state='open'] {
+    animation: enter-zoom 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  .tooltip-content[data-state='delayed-open'] {
+    animation: enter-fade 120ms ease-out;
+  }
+}
