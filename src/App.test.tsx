@@ -4,14 +4,14 @@ import userEvent from '@testing-library/user-event';
 import App from './App';
 import { RECENT_KEY } from '@/lib/recent';
 import { presetRange } from '@/lib/dates';
-import {
-  CRASH_JSON,
-  ENVELOPE_EDA_ERROR as EDA_ERROR,
-  ENVELOPE_MULTI as MULTI_NEW,
-  ENVELOPE_SINGLE as SINGLE_NEW,
-} from '@/test/fixtures/responses';
+import { ENVELOPES, httpText } from '@/test/json-fixtures';
 
-// Component tests use the real API Gateway format: a JSON envelope around the HTML.
+// Component tests use real backend responses in the API Gateway envelope.
+const SINGLE_NEW = httpText(ENVELOPES.single1y);
+const MULTI_NEW = httpText(ENVELOPES.multi3);
+const EDA_ERROR = httpText(ENVELOPES.unknown);
+const CRASH_JSON = JSON.stringify({ errorMessage: "'NoneType' object is not subscriptable", errorType: 'TypeError' });
+const UNKNOWN_MESSAGE = 'No data found for QXZQZ between 2025-10-28 and 2026-10-28. Check the ticker symbol and the date range.';
 
 type Deferred = { resolve: (r: Response) => void; reject: (e: unknown) => void };
 
@@ -46,7 +46,7 @@ describe('App', () => {
   it('renders the header, description, form and footer links', () => {
     render(<App />);
     expect(screen.getByRole('heading', { level: 1, name: 'Stock Price Analysis' })).toBeInTheDocument();
-    expect(screen.getByText('No charts yet')).toBeInTheDocument();
+    expect(screen.getByText('No analysis yet')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Front-End Code' })).toHaveAttribute(
       'href',
       'https://github.com/Shashank-Sund/stock-price-analysis-UI',
@@ -91,10 +91,10 @@ describe('App', () => {
     const button = screen.getByRole('button', { name: /analyzing/i });
     expect(button).toBeDisabled();
     expect(button).toHaveTextContent(/0s/);
-    expect(screen.getByTestId('chart-skeletons').children).toHaveLength(5);
+    expect(screen.getByTestId('dashboard-skeleton')).toBeInTheDocument();
     expect(fn).toHaveBeenCalledTimes(1);
     const body = JSON.parse((fn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(body).toEqual({ ...presetRangeBody('1Y'), symbol: 'AAPL' });
+    expect(body).toEqual({ ...presetRangeBody('1Y'), symbol: 'AAPL', format: 'json' });
 
     // Still disabled after more than the old fixed 5 s re-enable timer would have allowed.
     await waitFor(() => expect(button).toHaveTextContent(/[1-9]s/), { timeout: 2500 });
@@ -102,20 +102,21 @@ describe('App', () => {
 
     pending[0].resolve(new Response(SINGLE_NEW, { status: 200 }));
     expect(await screen.findByRole('button', { name: /^analyze$/i })).toBeEnabled();
-    expect(screen.getAllByRole('img')).toHaveLength(5);
-    expect(screen.getByRole('heading', { level: 3, name: 'Closing Stock Price Over Time' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 3, name: 'AAPL at a glance' })).toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-skeleton')).not.toBeInTheDocument();
   });
 
-  it('sends multiple tickers comma joined and shows one chart', async () => {
+  it('sends multiple tickers comma joined and shows the summary table', async () => {
     const fetchFn = mockFetchWith(MULTI_NEW);
     const user = userEvent.setup();
     render(<App />);
-    await fillForm(user, 'aapl, msft');
+    await fillForm(user, 'aapl, msft, nvda');
     await user.click(screen.getByRole('button', { name: /analyze/i }));
-    expect(await screen.findByText('Closing Stock Price of Multiple Companies Over Time')).toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: /summary statistics per ticker/i });
     const body = JSON.parse((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(body.symbol).toBe('AAPL,MSFT');
-    expect(screen.getByText('1 chart')).toBeInTheDocument();
+    expect(body.symbol).toBe('AAPL,MSFT,NVDA');
+    expect(within(table).getAllByRole('row')).toHaveLength(5); // header, 3 tickers, SPY
+    expect(within(table).getByText('Benchmark')).toBeInTheDocument();
   });
 
   it('includes a ticker that is still being typed when submitting', async () => {
@@ -126,19 +127,19 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Tickers'), 'tsla');
     await user.keyboard('{Enter}');
     await user.click(screen.getByRole('button', { name: /analyze/i }));
-    await screen.findAllByRole('img');
+    await screen.findByText(/at a glance/);
     expect(JSON.parse((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string).symbol).toBe('TSLA');
   });
 
-  it('shows eda-error messages in an alert', async () => {
+  it('shows the backend error message as is', async () => {
     mockFetchWith(EDA_ERROR);
     const user = userEvent.setup();
     render(<App />);
-    await fillForm(user, 'XYZ');
+    await fillForm(user, 'QXZQZ');
     await user.click(screen.getByRole('button', { name: /analyze/i }));
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText('Analysis failed')).toBeInTheDocument();
-    expect(within(alert).getByText('No data found for XYZ between 2024-01-01 and 2024-02-01')).toBeInTheDocument();
+    expect(within(alert).getByText(UNKNOWN_MESSAGE)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^analyze$/i })).toBeEnabled();
   });
 
@@ -173,7 +174,7 @@ describe('App', () => {
     render(<App />);
     await fillForm(user, 'NVDA');
     await user.click(screen.getByRole('button', { name: /analyze/i }));
-    await screen.findAllByRole('img');
+    await screen.findByText(/at a glance/);
 
     const stored = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
     expect(stored).toHaveLength(1);
@@ -206,35 +207,6 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /analyze/i }));
     await screen.findByRole('alert');
     expect(localStorage.getItem(RECENT_KEY)).toBeNull();
-  });
-
-  it('opens a chart full screen in a dialog', async () => {
-    mockFetchWith(SINGLE_NEW);
-    const user = userEvent.setup();
-    render(<App />);
-    await fillForm(user);
-    await user.click(screen.getByRole('button', { name: /analyze/i }));
-    await user.click(await screen.findByRole('button', { name: 'Open Daily Returns full screen' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('heading', { name: 'Daily Returns' })).toBeInTheDocument();
-    expect(within(dialog).getByText('5 of 5')).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: 'Next chart' }));
-    expect(within(dialog).getByRole('heading', { name: 'Closing Stock Price Over Time' })).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  });
-
-  it('downloads a chart as a PNG with a descriptive filename', async () => {
-    mockFetchWith(SINGLE_NEW);
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-      expect(this.download).toBe('AAPL_closing-stock-price-over-time.png');
-    });
-    const user = userEvent.setup();
-    render(<App />);
-    await fillForm(user);
-    await user.click(screen.getByRole('button', { name: /analyze/i }));
-    await user.click(await screen.findByRole('button', { name: 'Download Closing Stock Price Over Time as PNG' }));
-    expect(click).toHaveBeenCalledTimes(1);
   });
 
   it('toggles the theme and remembers the choice', async () => {

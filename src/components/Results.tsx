@@ -1,17 +1,15 @@
-import { useState, type ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import { ChartLine, CircleAlert, RotateCcw, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ChartCard, ChartCardSkeleton } from '@/components/ChartCard';
-import { ChartDialog } from '@/components/ChartDialog';
+import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
+import { LazyDashboard } from '@/components/dashboard/lazy';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import type { AnalysisState } from '@/hooks/useAnalysis';
 import type { AnalysisRequest } from '@/lib/api';
 import { formatDisplayDate } from '@/lib/dates';
-import { expectedChartCount, isWide } from '@/lib/layout';
-import { chartFilename, downloadDataUrl } from '@/lib/download';
-import type { Chart } from '@/lib/parse';
 
 function rangeText(q: AnalysisRequest) {
   return `${formatDisplayDate(q.startDate)} to ${formatDisplayDate(q.endDate)}`;
@@ -20,7 +18,9 @@ function rangeText(q: AnalysisRequest) {
 function QuerySummary({ q, trailing }: { q: AnalysisRequest; trailing: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <span aria-hidden="true" className="text-base font-semibold tracking-tight">Results</span>
+      <span aria-hidden="true" className="text-base font-semibold tracking-tight">
+        Results
+      </span>
       <div className="flex flex-wrap gap-1">
         {q.tickers.map((t) => (
           <Badge key={t} variant="secondary" className="font-mono">
@@ -41,16 +41,13 @@ interface ResultsProps {
 }
 
 export function Results({ state, onRetry, onExample }: ResultsProps) {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const { status, charts, error, query, elapsed } = state;
-
-  const download = (chart: Chart) => downloadDataUrl(chart.src, chartFilename(query?.tickers ?? [], chart.title));
+  const { status, data, error, query, elapsed } = state;
 
   const announcement =
     status === 'loading'
       ? 'Analyzing, please wait.'
-      : status === 'success'
-        ? `${charts.length} ${charts.length === 1 ? 'chart' : 'charts'} ready.`
+      : status === 'success' && data
+        ? `Analysis ready for ${data.tickers.join(', ')}.`
         : status === 'error'
           ? `Analysis failed. ${error ?? ''}`
           : '';
@@ -69,9 +66,10 @@ export function Results({ state, onRetry, onExample }: ResultsProps) {
           <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <ChartLine className="size-6" aria-hidden="true" />
           </div>
-          <p className="text-base font-medium">No charts yet</p>
+          <p className="text-base font-medium">No analysis yet</p>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Choose a date range and one or more tickers, then select Analyze. Charts appear here.
+            Choose a date range and up to 10 tickers, then select Analyze. Every ticker is compared with SPY, an S&amp;P 500
+            fund.
           </p>
           <Button variant="outline" size="sm" className="mt-5" onClick={onExample}>
             <Sparkles />
@@ -82,15 +80,8 @@ export function Results({ state, onRetry, onExample }: ResultsProps) {
 
       {status === 'loading' && query && (
         <>
-          <QuerySummary
-            q={query}
-            trailing={<>Working, {elapsed}s elapsed. This can take up to 30 seconds.</>}
-          />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2" data-testid="chart-skeletons">
-            {Array.from({ length: expectedChartCount(query) }, (_, i) => (
-              <ChartCardSkeleton key={i} wide={isWide(i, expectedChartCount(query))} />
-            ))}
-          </div>
+          <QuerySummary q={query} trailing={<>Working, {elapsed}s elapsed. This can take up to 30 seconds.</>} />
+          <DashboardSkeleton tickers={query.tickers.length} />
         </>
       )}
 
@@ -110,31 +101,14 @@ export function Results({ state, onRetry, onExample }: ResultsProps) {
         </Alert>
       )}
 
-      {status === 'success' && query && (
+      {status === 'success' && query && data && (
         <>
-          <QuerySummary
-            q={query}
-            trailing={`${charts.length} ${charts.length === 1 ? 'chart' : 'charts'}`}
-          />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {charts.map((c, i) => (
-              <ChartCard
-                key={`${i}-${c.title}`}
-                chart={c}
-                index={i}
-                wide={isWide(i, charts.length)}
-                onOpen={() => setOpenIndex(i)}
-                onDownload={() => download(c)}
-              />
-            ))}
-          </div>
-          <ChartDialog
-            charts={charts}
-            index={openIndex}
-            onIndexChange={setOpenIndex}
-            subtitle={`${query.tickers.join(', ')}, ${rangeText(query)}`}
-            onDownload={download}
-          />
+          <QuerySummary q={query} trailing={data.interval === '1wk' ? 'Weekly bars' : 'Daily bars'} />
+          <ErrorBoundary resetKey={data}>
+            <Suspense fallback={<DashboardSkeleton tickers={query.tickers.length} />}>
+              <LazyDashboard data={data} query={query} />
+            </Suspense>
+          </ErrorBoundary>
         </>
       )}
     </section>
