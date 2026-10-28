@@ -56,6 +56,8 @@ describe('App', () => {
       'https://github.com/Shashank-Sund/docker-lambda-aws3',
     );
     expect(screen.getByText('A Shashank Sundararaman Production')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Charts by TradingView' })).toHaveAttribute('href', 'https://www.tradingview.com/');
+    expect(screen.getByRole('heading', { name: "How it's built" })).toBeInTheDocument();
   });
 
   it('shows validation errors and does not call the API', async () => {
@@ -207,6 +209,31 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /analyze/i }));
     await screen.findByRole('alert');
     expect(localStorage.getItem(RECENT_KEY)).toBeNull();
+  });
+
+  it('downloads the selected ticker as CSV, or all tickers', async () => {
+    mockFetchWith(MULTI_NEW);
+    const names: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      names.push(this.download);
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await fillForm(user, 'aapl, msft, nvda');
+    await user.click(screen.getByRole('button', { name: /analyze/i }));
+    await user.click(await screen.findByRole('button', { name: 'Show MSFT charts' }));
+    await user.click(screen.getByRole('button', { name: 'CSV: MSFT' }));
+    await user.click(screen.getByRole('button', { name: 'CSV: all tickers' }));
+    expect(names).toEqual(['MSFT_2025-10-28_to_2026-10-28.csv', 'AAPL-MSFT-NVDA-and-1-more_2025-10-28_to_2026-10-28.csv']);
+  });
+
+  it('shows a readable message for an unreadable response', async () => {
+    mockFetchWith('<!DOCTYPE html><html><body><img src="x"></body></html>');
+    const user = userEvent.setup();
+    render(<App />);
+    await fillForm(user);
+    await user.click(screen.getByRole('button', { name: /analyze/i }));
+    expect(within(await screen.findByRole('alert')).getByText(/could not read/)).toBeInTheDocument();
   });
 
   it('toggles the theme and remembers the choice', async () => {

@@ -1,6 +1,8 @@
 const links = [
   { href: 'https://github.com/Shashank-Sund/stock-price-analysis-UI', label: 'Front-End Code' },
   { href: 'https://github.com/Shashank-Sund/docker-lambda-aws3', label: 'Back-End Code' },
+  // Required attribution for TradingView Lightweight Charts (Apache 2.0 NOTICE).
+  { href: 'https://www.tradingview.com/', label: 'Charts by TradingView' },
 ];
 
 export function Footer() {
@@ -8,7 +10,7 @@ export function Footer() {
     <footer className="border-t">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p>A Shashank Sundararaman Production</p>
-        <nav aria-label="Source code" className="flex gap-5">
+        <nav aria-label="Source code and credits" className="flex flex-wrap gap-x-5 gap-y-2">
           {links.map((l) => (
             <a
               key={l.href}

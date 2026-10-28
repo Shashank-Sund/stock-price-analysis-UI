@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { AnalyzeForm } from '@/components/AnalyzeForm';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
+import { HowItsBuilt } from '@/components/HowItsBuilt';
 import { Results } from '@/components/Results';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useAnalysis } from '@/hooks/useAnalysis';
@@ -105,6 +106,7 @@ export default function App() {
             onRetry={() => state.query && submit(state.query)}
             onExample={() => fill({ ...presetRange('1Y'), tickers: ['AAPL'] })}
           />
+          <HowItsBuilt />
         </main>
         <Footer />
       </div>
