@@ -49,3 +49,10 @@ if (!('ResizeObserver' in window)) {
 
 // jsdom prints "not implemented" for canvas; color resolution falls back without it.
 HTMLCanvasElement.prototype.getContext = (() => null) as unknown as HTMLCanvasElement['getContext'];
+
+// jsdom has no layout, so Recharts' ResponsiveContainer measures 0 x 0 and warns; that is expected here.
+const warn = console.warn.bind(console);
+console.warn = (...args: unknown[]) => {
+  if (typeof args[0] === 'string' && args[0].startsWith('The width(0) and height(0) of chart')) return;
+  warn(...args);
+};
