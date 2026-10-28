@@ -34,4 +34,5 @@ export const HistogramSeries = { type: 'Histogram' };
 export const ColorType = { Solid: 'solid' };
 export const CrosshairMode = { Normal: 0, Magnet: 1 };
 export const PriceScaleMode = { Normal: 0, Logarithmic: 1 };
+export const TickMarkType = { Year: 0, Month: 1, DayOfMonth: 2, Time: 3, TimeWithSeconds: 4 };
 export const LineStyle = { Solid: 0, Dotted: 1, Dashed: 2 };
