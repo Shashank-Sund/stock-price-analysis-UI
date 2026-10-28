@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_API_URL, fetchAnalysis, parseJsonResponse, toJsonRequestBody, UNEXPECTED_MESSAGE } from './api';
+import { BUSY_MESSAGE, DEFAULT_API_URL, fetchAnalysis, parseJsonResponse, toJsonRequestBody, UNEXPECTED_MESSAGE } from './api';
 import { ENVELOPES, httpText, SINGLE } from '@/test/json-fixtures';
 
 const req = { startDate: '2025-10-28', endDate: '2026-10-28', tickers: ['AAPL'] };
@@ -111,5 +111,54 @@ describe('fetchAnalysis', () => {
     );
     const e = await fetchAnalysis(req, { fetchImpl: fetchImpl as unknown as typeof fetch, timeoutMs: 20 }).catch((x) => x);
     expect(e.kind).toBe('timeout');
+  });
+
+  describe('when the service is busy', () => {
+    // The exact answer API Gateway gave on staging for a request over the Lambda's concurrency cap.
+    const busy = () => new Response('{"message": "Internal server error"}', { status: 500 });
+    const ok = () => new Response(httpText(ENVELOPES.single1y), { status: 200 });
+    const sequence = (...replies: (() => Response)[]) => {
+      const fetchImpl = vi.fn(async () => (replies.shift() ?? busy)());
+      return fetchImpl as unknown as typeof fetch & typeof fetchImpl;
+    };
+
+    it('retries quietly and returns the data', async () => {
+      const fetchImpl = sequence(busy, busy, ok);
+      const data = await fetchAnalysis(req, { fetchImpl, retryDelaysMs: [1, 1] });
+      expect(data.series.AAPL).toBeDefined();
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    });
+
+    it('gives up after the retries with a friendly message', async () => {
+      const fetchImpl = sequence();
+      const e = await fetchAnalysis(req, { fetchImpl, retryDelaysMs: [1, 1] }).catch((x) => x);
+      expect(e).toMatchObject({ kind: 'busy', message: BUSY_MESSAGE });
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    });
+
+    it('treats a 429 throttle as busy', async () => {
+      const fetchImpl = sequence(() => new Response('{"message":"Too Many Requests"}', { status: 429 }), ok);
+      await expect(fetchAnalysis(req, { fetchImpl, retryDelaysMs: [1] })).resolves.toBeDefined();
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry other errors', async () => {
+      const fetchImpl = sequence(() => new Response(httpText(ENVELOPES.unknown), { status: 200 }));
+      await expect(fetchAnalysis(req, { fetchImpl, retryDelaysMs: [1, 1] })).rejects.toMatchObject({ kind: 'server' });
+      const gateway = sequence(() => new Response('oops', { status: 502 }));
+      await expect(fetchAnalysis(req, { fetchImpl: gateway, retryDelaysMs: [1, 1] })).rejects.toMatchObject({ kind: 'http' });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(gateway).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops waiting when the request is cancelled', async () => {
+      const ctrl = new AbortController();
+      const fetchImpl = sequence(busy, ok);
+      const pending = fetchAnalysis(req, { fetchImpl, signal: ctrl.signal, retryDelaysMs: [60_000] });
+      await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+      ctrl.abort();
+      await expect(pending).rejects.toMatchObject({ kind: 'aborted' });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    });
   });
 });
