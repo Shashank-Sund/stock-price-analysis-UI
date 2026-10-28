@@ -2,6 +2,8 @@
 
 https://shaismarketpriceeda.com/
 
+New here? [GUIDE.md](GUIDE.md) explains everything the app does in plain language.
+
 Front end for **Stock Price Analysis**, a tool that collects, cleans and explores historical market prices. Pick a date range and up to 10 tickers; the back end (https://github.com/Shashank-Sund/docker-lambda-aws3) returns prices and statistics as JSON and this site draws every chart in the browser:
 
 - **Summary**: KPI cards for one ticker (total and annual return, volatility, Sharpe with a 0% risk-free rate, max drawdown with dates, best and worst day, period high and low, beta and return versus SPY), or a compact table with an SPY row for several. Every metric has a plain language explanation.
@@ -92,7 +94,7 @@ Content-Type: application/json
 
 The API Gateway integration is non-proxy, so the HTTP status is 200 and the text is the Lambda's return value: `{"statusCode": 200, "headers": {...}, "body": "<JSON string>"}`. The client parses the envelope, then `body`. A success body has `tickers`, `interval` (`1d` or `1wk`), `series` (one entry per ticker plus SPY: prices, summary, return statistics, risk series, seasonality), `benchmark` and `compare` (cumulative returns, correlation matrix, risk and return points). Errors are `{"error": "..."}` with statusCode 400 or 500, shown to the user as is.
 
-The client also handles the old crash body `{"errorMessage": ...}`, API Gateway `{"message": ...}` errors, non 2xx statuses, an unreadable body (a generic "could not read" message), network failures and a 35 second client timeout (API Gateway gives up at 29 seconds). Tickers are sent as typed; SPY is left out of the request only when it would push the symbol count past the backend's limit of 10, since the backend adds it anyway.
+The client also handles the old crash body `{"errorMessage": ...}`, API Gateway `{"message": ...}` errors, non 2xx statuses, an unreadable body (a generic "could not read" message), network failures and a 35 second client timeout (API Gateway gives up at 29 seconds). Tickers are sent as typed; the backend does not count SPY toward its limit of 10.
 
 ## Mock API
 
