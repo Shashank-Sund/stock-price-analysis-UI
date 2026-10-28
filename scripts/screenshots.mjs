@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Captures UI screenshots of a running preview build against the mock API.
+ * Dashboard screenshots of a running preview build against the mock API.
  *
- *   VITE_API_URL=http://localhost:8787 npm run build
- *   npm run mock-api &   npm run preview &
- *   npm run screenshots -- [outDir]
+ *   VITE_API_URL=/api npm run build
+ *   npm run mock-api &
+ *   API_PROXY_TARGET=http://localhost:8787 npx vite preview &
+ *   npm run screenshots -- <outDir> [filter]
  *
- * Uses playwright-core with the locally installed Google Chrome (channel "chrome").
- * Set CHROME_PATH to use a different Chromium binary. APP_URL defaults to http://localhost:4173.
+ * Uses playwright-core with the local Google Chrome. Every scenario runs at 1280 and 390
+ * px wide in light and dark. Console errors and page errors are printed and counted.
  */
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -15,34 +16,42 @@ import { chromium } from 'playwright-core';
 
 const APP_URL = process.env.APP_URL ?? 'http://localhost:4173';
 const outDir = resolve(process.argv[2] ?? 'screenshots');
+const filter = process.argv[3] ? new RegExp(process.argv[3]) : null;
 mkdirSync(outDir, { recursive: true });
 
 const browser = await chromium.launch(
   process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' },
 );
+let problems = 0;
 
-async function newPage({ width = 1280, height = 900, scheme = 'light', reducedMotion = 'reduce' } = {}) {
+async function open({ width, scheme }) {
   const context = await browser.newContext({
-    viewport: { width, height },
+    viewport: { width, height: width < 600 ? 844 : 900 },
     deviceScaleFactor: 2,
     colorScheme: scheme,
-    reducedMotion,
+    reducedMotion: 'reduce',
   });
   const page = await context.newPage();
-  page.on('console', (m) => m.type() === 'error' && console.log(`[console] ${m.text()}`));
-  page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
+  page.on('console', (m) => {
+    if (m.type() === 'error' || m.type() === 'warning') {
+      problems++;
+      console.log(`  [console.${m.type()}] ${m.text()}`);
+    }
+  });
+  page.on('pageerror', (e) => {
+    problems++;
+    console.log(`  [pageerror] ${e.message}`);
+  });
   await page.goto(APP_URL);
   return { page, context };
 }
 
-const shot = async (page, name, fullPage = true) => {
-  const path = join(outDir, `${name}.png`);
-  await page.screenshot({ path, fullPage });
-  console.log(`saved ${path}`);
-};
-
-async function analyze(page, tickers, preset = '1Y') {
-  await page.getByRole('button', { name: preset, exact: true }).click();
+async function analyze(page, tickers, range) {
+  if (typeof range === 'string') await page.getByRole('button', { name: range, exact: true }).click();
+  else {
+    await page.getByLabel('Start date').fill(range[0]);
+    await page.getByLabel('End date').fill(range[1]);
+  }
   const input = page.getByRole('textbox', { name: 'Tickers' });
   for (const t of tickers) {
     await input.fill(t);
@@ -51,91 +60,99 @@ async function analyze(page, tickers, preset = '1Y') {
   await page.getByRole('button', { name: /^analyze$/i }).click();
 }
 
-// 1. Empty state.
-{
-  const { page, context } = await newPage();
-  await shot(page, '01-empty');
-  // 2. Loading (SLOW takes 5 s).
-  await analyze(page, ['SLOW']);
-  await page.waitForTimeout(2200);
-  await shot(page, '02-loading');
-  await page.getByRole('button', { name: /^analyze$/i }).waitFor({ timeout: 15000 });
-  await context.close();
+async function ready(page) {
+  await page.getByRole('heading', { name: /at a glance|^Summary$/ }).waitFor({ timeout: 40000 });
+  await page.getByTestId('price-chart-canvas').locator('canvas').first().waitFor({ timeout: 40000 });
+  await page.waitForTimeout(600);
 }
 
-// 3. Single ticker result.
-{
-  const { page, context } = await newPage();
-  await analyze(page, ['AAPL']);
-  await page.getByRole('img', { name: 'Daily Returns' }).waitFor();
-  await page.waitForTimeout(300);
-  await shot(page, '03-single');
-  // Full screen dialog.
-  await page.getByRole('button', { name: 'Open Correlation Between Stock Prices full screen' }).click();
-  await page.getByRole('dialog').waitFor();
-  await page.waitForTimeout(300);
-  await shot(page, '03b-dialog', false);
-  await context.close();
+/** Counts a problem when the page scrolls sideways (content wider than the viewport). */
+async function checkOverflow(page, label) {
+  const { sw, vw } = await page.evaluate(() => ({ sw: globalThis.document.documentElement.scrollWidth, vw: globalThis.document.documentElement.clientWidth }));
+  if (sw > vw) {
+    problems++;
+    console.log(`  [overflow] ${label}: page is ${sw}px wide in a ${vw}px viewport`);
+  }
 }
 
-// 4. Multiple tickers.
-{
-  const { page, context } = await newPage();
-  await analyze(page, ['AAPL', 'MSFT', 'GOOG']);
-  await page.getByRole('img', { name: /Multiple Companies/ }).waitFor();
-  await page.waitForTimeout(300);
-  await shot(page, '04-multi');
-  await context.close();
+const shot = async (page, name, fullPage = true) => {
+  await checkOverflow(page, name);
+  // The sticky header would otherwise be captured mid page.
+  if (fullPage) await page.evaluate(() => globalThis.scrollTo(0, 0));
+  const path = join(outDir, `${name}.png`);
+  await page.screenshot({ path, fullPage });
+  console.log(`saved ${path}`);
+};
+
+/** Selects a dashboard tab if it exists and screenshots it. */
+async function tab(page, name, label) {
+  const t = page.getByRole('tab', { name });
+  if ((await t.count()) === 0) return;
+  await t.click();
+  await page.waitForTimeout(700);
+  await shot(page, label);
 }
 
-// 5. Errors: eda-error, then old crash JSON.
-{
-  const { page, context } = await newPage();
-  await analyze(page, ['ERR']);
-  await page.getByRole('alert').waitFor();
-  await shot(page, '05-error');
-  await page.getByRole('button', { name: 'Remove ERR' }).click();
-  await analyze(page, ['CRASH']);
-  await page.getByText(/analysis service failed/i).first().waitFor();
-  await shot(page, '05b-error-crash');
-  // Validation errors.
-  await page.reload();
-  await page.getByRole('button', { name: /^analyze$/i }).click();
-  await page.waitForTimeout(400);
-  await shot(page, '05c-validation');
-  await context.close();
+const SCENARIOS = {
+  single: { tickers: ['AAPL'], range: '1Y' },
+  multi: { tickers: ['AAPL', 'MSFT', 'NVDA'], range: '1Y' },
+  weekly: { tickers: ['NVDA'], range: ['2016-10-28', '2026-10-28'] },
+  spy: { tickers: ['TSLA', 'SPY'], range: '1Y' },
+  short: { tickers: ['AMZN'], range: ['2026-09-28', '2026-10-28'] },
+  max: {
+    tickers: ['AAPL', 'MSFT', 'NVDA', 'GOOG', 'AMZN', 'META', 'TSLA', 'JPM', 'XOM', 'BRK-B'],
+    range: ['2006-10-28', '2026-10-28'],
+  },
+};
+
+for (const [name, sc] of Object.entries(SCENARIOS)) {
+  for (const width of [1280, 390]) {
+    for (const scheme of ['light', 'dark']) {
+      const label = `${name}-${width}-${scheme}`;
+      if (filter && !filter.test(label)) continue;
+      console.log(label);
+      const { page, context } = await open({ width, scheme });
+      const t0 = Date.now();
+      await analyze(page, sc.tickers, sc.range);
+      await ready(page);
+      console.log(`  ready in ${Date.now() - t0} ms`);
+      await shot(page, `${label}`);
+      await tab(page, 'Returns', `${label}-returns`);
+      await tab(page, 'Risk', `${label}-risk`);
+      await tab(page, 'Seasonality', `${label}-seasonality`);
+      await tab(page, 'Compare', `${label}-compare`);
+      await context.close();
+    }
+  }
 }
 
-// 6. Dark mode: empty and single result.
-{
-  const { page, context } = await newPage({ scheme: 'dark' });
-  await shot(page, '06-dark-empty');
-  await analyze(page, ['AAPL']);
-  await page.getByRole('img', { name: 'Daily Returns' }).waitFor();
-  await page.waitForTimeout(300);
-  await shot(page, '06-dark-single');
-  await analyze(page, ['ERR']);
-  await page.getByRole('alert').waitFor();
-  await shot(page, '06-dark-error');
-  await context.close();
-}
-
-// 7. Mobile width 390 px: empty with recent chips, then a result.
-{
-  const { page, context } = await newPage({ width: 390, height: 844 });
-  await analyze(page, ['AAPL']);
-  await page.getByRole('img', { name: 'Daily Returns' }).waitFor();
-  await page.getByRole('button', { name: 'Remove AAPL' }).click();
-  await analyze(page, ['MSFT', 'NVDA'], '6M');
-  await page.getByRole('img', { name: /Multiple Companies/ }).waitFor();
-  await page.waitForTimeout(300);
-  await shot(page, '07-mobile');
-  const { page: p2, context: c2 } = await newPage({ width: 390, height: 844, scheme: 'dark' });
-  await analyze(p2, ['SLOW']);
-  await p2.waitForTimeout(1500);
-  await shot(p2, '07b-mobile-dark-loading');
-  await c2.close();
-  await context.close();
+// States: empty, loading, error, unreadable response, validation.
+for (const scheme of ['light', 'dark']) {
+  for (const width of [1280, 390]) {
+    const label = `states-${width}-${scheme}`;
+    if (filter && !filter.test(label)) continue;
+    console.log(label);
+    const { page, context } = await open({ width, scheme });
+    await shot(page, `${label}-empty`);
+    await analyze(page, ['SLOW'], '1Y');
+    await page.waitForTimeout(1500);
+    await shot(page, `${label}-loading`);
+    await page.getByRole('button', { name: /^analyze$/i }).waitFor({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Remove SLOW' }).click();
+    await analyze(page, ['QXZQZ'], '1Y');
+    await page.getByRole('alert').waitFor();
+    await shot(page, `${label}-error`);
+    await page.getByRole('button', { name: 'Remove QXZQZ' }).click();
+    await analyze(page, ['BADJSON'], '1Y');
+    await page.getByRole('alert').getByText(/could not read/).waitFor();
+    await shot(page, `${label}-unreadable`, false);
+    await page.reload();
+    await page.getByRole('button', { name: /^analyze$/i }).click();
+    await page.waitForTimeout(300);
+    await shot(page, `${label}-validation`, false);
+    await context.close();
+  }
 }
 
 await browser.close();
+console.log(problems ? `${problems} console problems` : 'no console errors or warnings');
