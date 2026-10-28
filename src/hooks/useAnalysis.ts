@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { analyze, ApiError, type AnalysisRequest } from '@/lib/api';
-import type { Chart } from '@/lib/parse';
+import { ApiError, type AnalysisRequest } from '@/lib/api';
+import { fetchAnalysis } from '@/lib/analysis-api';
+import type { AnalysisResponse } from '@/lib/types';
+import { loadDashboard } from '@/components/dashboard/lazy';
 
 export type AnalysisStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export interface AnalysisState {
   status: AnalysisStatus;
-  charts: Chart[];
+  data: AnalysisResponse | null;
   error: string | null;
   /** The query currently running, or the one that produced the shown result. */
   query: AnalysisRequest | null;
   elapsed: number;
 }
 
-const initial: AnalysisState = { status: 'idle', charts: [], error: null, query: null, elapsed: 0 };
+const initial: AnalysisState = { status: 'idle', data: null, error: null, query: null, elapsed: 0 };
 
 export function useAnalysis(onSuccess?: (q: AnalysisRequest) => void) {
   const [state, setState] = useState<AnalysisState>(initial);
@@ -31,7 +33,9 @@ export function useAnalysis(onSuccess?: (q: AnalysisRequest) => void) {
     const id = ++requestId.current;
     const startedAt = Date.now();
 
-    setState({ status: 'loading', charts: [], error: null, query, elapsed: 0 });
+    setState({ status: 'loading', data: null, error: null, query, elapsed: 0 });
+    // Fetch the dashboard code while the API works.
+    void loadDashboard().catch(() => {});
     const tick = setInterval(() => {
       if (requestId.current !== id) return;
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
@@ -39,15 +43,15 @@ export function useAnalysis(onSuccess?: (q: AnalysisRequest) => void) {
     }, 250);
 
     try {
-      const charts = await analyze(query, { signal: ctrl.signal });
+      const data = await fetchAnalysis(query, { signal: ctrl.signal });
       if (requestId.current !== id) return;
-      setState({ status: 'success', charts, error: null, query, elapsed: 0 });
+      setState({ status: 'success', data, error: null, query, elapsed: 0 });
       onSuccessRef.current?.(query);
     } catch (err) {
       if (requestId.current !== id) return;
       if (err instanceof ApiError && err.kind === 'aborted') return;
       const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
-      setState({ status: 'error', charts: [], error: message, query, elapsed: 0 });
+      setState({ status: 'error', data: null, error: message, query, elapsed: 0 });
     } finally {
       clearInterval(tick);
     }

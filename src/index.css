@@ -31,6 +31,33 @@
   --ring: oklch(0.55 0.16 287);
   --figure: oklch(1 0 0);
   --shadow-card: 0 1px 2px 0 oklch(0.2 0.01 286 / 0.05), 0 1px 3px 0 oklch(0.2 0.01 286 / 0.04);
+  /*
+   * Chart tokens. Categorical slots in a fixed order (validated for CVD separation on
+   * adjacent pairs in both themes); the benchmark is a neutral gray. Diverging scales
+   * run red (negative) through a neutral gray to blue (positive).
+   */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+  --series-bench: #8b8a94;
+  --chart-grid: oklch(0.94 0.003 286);
+  --chart-axis: oklch(0.55 0.012 286);
+  --chart-sma50: oklch(0.45 0.01 286);
+  --chart-sma200: oklch(0.62 0.01 286);
+  --chart-volume: oklch(0.82 0.008 286);
+  --chart-highlight: oklch(0.6 0.2 27 / 0.1);
+  --up: #0ca30c;
+  --down: #d03b3b;
+  --positive: oklch(0.5 0.14 150);
+  --negative: oklch(0.52 0.19 27);
+  --div-pos: #1c5cab;
+  --div-neg: #c53030;
+  --div-mid: #f0efec;
   color-scheme: light;
 }
 
@@ -57,6 +84,28 @@
   /* Charts are white matplotlib figures; a matching white panel avoids two-tone letterboxing. */
   --figure: oklch(1 0 0);
   --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --series-bench: #8e8d98;
+  --chart-grid: oklch(1 0 0 / 7%);
+  --chart-axis: oklch(0.7 0.012 286);
+  --chart-sma50: oklch(0.85 0.01 286);
+  --chart-sma200: oklch(0.65 0.01 286);
+  --chart-volume: oklch(0.38 0.008 286);
+  --chart-highlight: oklch(0.7 0.19 22 / 0.14);
+  --up: #0ca30c;
+  --down: #e66767;
+  --positive: oklch(0.76 0.15 150);
+  --negative: oklch(0.74 0.15 22);
+  --div-pos: #3987e5;
+  --div-neg: #d64545;
+  --div-mid: #303036;
   color-scheme: dark;
 }
 
@@ -85,6 +134,8 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-figure: var(--figure);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
   --shadow-card: var(--shadow-card);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

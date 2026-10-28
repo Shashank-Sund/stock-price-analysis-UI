@@ -32,3 +32,20 @@ if (!URL.createObjectURL) {
   URL.createObjectURL = () => 'blob:mock';
   URL.revokeObjectURL = () => {};
 }
+
+// Charts: Lightweight Charts needs a real canvas, so tests use a recording stand in.
+vi.mock('lightweight-charts', () => import('./lightweight-charts-mock'));
+
+// jsdom has no layout: give ResizeObserver a no-op and charts a fixed size.
+if (!('ResizeObserver' in window)) {
+  class RO {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(window, 'ResizeObserver', { writable: true, value: RO });
+  Object.defineProperty(globalThis, 'ResizeObserver', { writable: true, value: RO });
+}
+
+// jsdom prints "not implemented" for canvas; color resolution falls back without it.
+HTMLCanvasElement.prototype.getContext = (() => null) as unknown as HTMLCanvasElement['getContext'];

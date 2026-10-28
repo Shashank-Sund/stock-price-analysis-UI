@@ -69,8 +69,8 @@ export function AnalyzeForm(props: AnalyzeFormProps) {
       <CardHeader className="pb-4 sm:pb-5">
         <CardTitle>New analysis</CardTitle>
         <CardDescription>
-          Enter one ticker for a full set of charts (closing price, correlation, distribution, daily returns
-          and yearly spread), or several tickers to compare their closing prices.
+          Pick a date range and up to 10 tickers. You get a summary, an interactive price chart, return and risk
+          statistics, seasonality and a comparison with SPY, an S&amp;P 500 fund used as the benchmark.
         </CardDescription>
       </CardHeader>
       <CardContent>
