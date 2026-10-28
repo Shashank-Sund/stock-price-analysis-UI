@@ -171,19 +171,19 @@ export function AnalyzeForm(props: AnalyzeFormProps) {
               <History className="size-3.5" aria-hidden="true" />
               Recent
             </span>
-            <ul className="flex flex-wrap gap-1.5" aria-label="Recent searches">
+            <ul className="flex min-w-0 max-w-full flex-wrap gap-1.5" aria-label="Recent searches">
               {recent.map((q) => (
-                <li key={recentKey(q)}>
+                <li key={recentKey(q)} className="min-w-0 max-w-full">
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={loading}
                     onClick={() => props.onRecent(q)}
-                    className="h-7 rounded-full px-3"
+                    className="h-7 max-w-full rounded-full px-3"
                     aria-label={`Rerun ${q.tickers.join(', ')} from ${formatDisplayDate(q.startDate)} to ${formatDisplayDate(q.endDate)}`}
                   >
-                    <span className="font-mono text-xs font-semibold">{q.tickers.join(', ')}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
+                    <span className="min-w-0 truncate font-mono text-xs font-semibold">{q.tickers.join(', ')}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                       {formatDisplayDate(q.startDate)} to {formatDisplayDate(q.endDate)}
                     </span>
                   </Button>

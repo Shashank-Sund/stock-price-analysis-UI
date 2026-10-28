@@ -72,7 +72,7 @@ function benchmarkKpi(t: TickerData, view: DashboardView) {
   );
 }
 
-export function SummaryCards({ ticker: t, view }: { ticker: TickerData; view: DashboardView }) {
+export function SummaryCards({ ticker: t, view, actions }: { ticker: TickerData; view: DashboardView; actions?: ReactNode }) {
   const s = t.summary;
   // Short dates (no year) only when the whole range is inside one calendar year.
   const oneYear = (s.start_date ?? '').slice(0, 4) === (s.end_date ?? '').slice(0, 4);
@@ -88,6 +88,7 @@ export function SummaryCards({ ticker: t, view }: { ticker: TickerData; view: Da
         id="summary-heading"
         title={`${t.symbol} at a glance`}
         description={`${formatDateRange(s.start_date, s.end_date)}, ${formatInteger(s.trading_days)} trading days`}
+        actions={actions}
       />
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
@@ -228,11 +229,13 @@ export function SummaryTable({
   view,
   active,
   onSelect,
+  actions,
 }: {
   data: AnalysisResponse;
   view: DashboardView;
   active: string;
   onSelect: (t: string) => void;
+  actions?: ReactNode;
 }) {
   const first = data.series[view.tickers[0]].summary;
   return (
@@ -241,6 +244,7 @@ export function SummaryTable({
         id="summary-heading"
         title="Summary"
         description={`${formatDateRange(first.start_date, first.end_date)}. Select a ticker to show its charts.`}
+        actions={actions}
       />
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">

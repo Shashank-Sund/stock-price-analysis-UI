@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, type AnalysisRequest } from '@/lib/api';
-import { fetchAnalysis } from '@/lib/analysis-api';
+import { ApiError, fetchAnalysis, type AnalysisRequest } from '@/lib/api';
 import type { AnalysisResponse } from '@/lib/types';
 import { loadDashboard } from '@/components/dashboard/lazy';
 
