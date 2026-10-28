@@ -98,7 +98,7 @@
   --chart-sma50: oklch(0.85 0.01 286);
   --chart-sma200: oklch(0.65 0.01 286);
   --chart-volume: oklch(0.38 0.008 286);
-  --chart-highlight: oklch(0.7 0.19 22 / 0.14);
+  --chart-highlight: oklch(0.7 0.19 22 / 0.09);
   --up: #0ca30c;
   --down: #e66767;
   --positive: oklch(0.76 0.15 150);

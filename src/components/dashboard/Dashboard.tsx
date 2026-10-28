@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import type { AnalysisRequest } from '@/lib/api';
 import { buildView } from '@/lib/dashboard';
 import type { AnalysisResponse } from '@/lib/types';
+import { AnalysisTabs } from './AnalysisTabs';
 import { PriceCard } from './PriceCard';
 import { SummaryCards, SummaryTable } from './Summary';
 
@@ -29,6 +30,7 @@ export default function Dashboard({ data, query }: DashboardProps) {
         <SummaryTable data={data} view={view} active={active} onSelect={setSelected} />
       )}
       <PriceCard ticker={ticker} view={view} interval={data.interval} onSelect={setSelected} />
+      <AnalysisTabs data={data} view={view} active={active} onSelect={setSelected} />
     </div>
   );
 }
