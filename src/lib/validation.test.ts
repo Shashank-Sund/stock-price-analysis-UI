@@ -48,3 +48,22 @@ describe('validateForm', () => {
     expect(TICKER_RE.test(t)).toBe(false);
   });
 });
+
+describe('backend limits', () => {
+  const tenOthers = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+
+  it('allows 10 tickers plus SPY', () => {
+    expect(validateForm({ ...ok, tickers: [...tenOthers, 'SPY'] }, today).tickers).toBeUndefined();
+  });
+
+  it('rejects more than 10 tickers', () => {
+    expect(validateForm({ ...ok, tickers: [...tenOthers, 'K'] }, today).tickers).toMatch(/at most 10 tickers/);
+  });
+
+  it('allows exactly 20 years and rejects more', () => {
+    expect(validateForm({ ...ok, startDate: '2005-10-27', endDate: '2025-10-27' }, today).startDate).toBeUndefined();
+    expect(validateForm({ ...ok, startDate: '2005-10-26', endDate: '2025-10-27' }, today).startDate).toBe(
+      'The date range can be at most 20 years.',
+    );
+  });
+});
