@@ -20,6 +20,9 @@ describe('buildView', () => {
     expect(v.benchmark).toBeNull();
     expect(v.userHasBenchmark).toBe(true);
     expect(v.symbols).toEqual(['TSLA', 'SPY']);
+    // Still drawn as the benchmark, and TSLA keeps the first slot.
+    expect(v.styles.SPY).toMatchObject({ benchmark: true, dashed: true });
+    expect(v.styles.TSLA.color).toBe('var(--series-1)');
   });
 
   it('puts SPY back when it was left out of the request to stay within the backend limit', () => {
