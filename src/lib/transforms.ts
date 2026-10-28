@@ -143,3 +143,54 @@ export function extremes(dates: string[], values: Num[]): { min: Extreme | null;
   });
   return { min, max, last };
 }
+
+// ---------------------------------------------------------------------------
+// Seasonality
+
+export interface HeatCell {
+  year: number;
+  month: number;
+  value: Num;
+  partial: boolean;
+}
+
+export interface HeatmapGrid {
+  /** One row per calendar year in range, ascending, each with 12 month slots (null when out of range). */
+  rows: { year: number; cells: (HeatCell | null)[]; total: Num; totalPartial: boolean }[];
+  /** Symmetric color scale bound: values at or beyond +/- scale get full color. */
+  scale: number;
+}
+
+/** Years by months grid from the monthly returns, with each year's compounded return. */
+export function buildHeatmap(monthly: { year: number; month: number; return: Num; partial: boolean }[]): HeatmapGrid {
+  const byYear = new Map<number, (HeatCell | null)[]>();
+  for (const m of monthly) {
+    if (m.month < 1 || m.month > 12) continue;
+    if (!byYear.has(m.year)) byYear.set(m.year, new Array(12).fill(null));
+    byYear.get(m.year)![m.month - 1] = { year: m.year, month: m.month, value: m.return, partial: m.partial };
+  }
+  const years = [...byYear.keys()].sort((a, b) => a - b);
+  const rows = years.map((year) => {
+    const cells = byYear.get(year)!;
+    const present = cells.filter((c): c is HeatCell => c !== null);
+    const values = present.map((c) => c.value);
+    const total = values.length && values.every((v) => v !== null) ? values.reduce<number>((p, v) => p * (1 + (v as number)), 1) - 1 : null;
+    // A year is partial when it does not cover all 12 months or includes a partial month.
+    const totalPartial = present.length < 12 || present.some((c) => c.partial);
+    return { year, cells, total, totalPartial };
+  });
+  const abs = monthly.map((m) => Math.abs(m.return ?? 0)).filter((v) => v > 0).sort((a, b) => a - b);
+  // 90th percentile so one outlier does not wash out the rest, rounded up to a whole percent.
+  const p90 = abs.length ? abs[Math.min(abs.length - 1, Math.floor(abs.length * 0.9))] : 0.05;
+  const scale = Math.max(0.02, Math.ceil(p90 * 100) / 100);
+  return { rows, scale };
+}
+
+/** Diverging color for a return: red below zero, blue above, neutral gray at zero (CSS color-mix). */
+export function divergingColor(value: Num, scale: number): { background: string; strong: boolean } {
+  if (value === null || !Number.isFinite(value) || scale <= 0) return { background: 'var(--muted)', strong: false };
+  const t = Math.min(1, Math.abs(value) / scale);
+  const pct = Math.round(t * 100);
+  const pole = value >= 0 ? 'var(--div-pos)' : 'var(--div-neg)';
+  return { background: `color-mix(in oklch, ${pole} ${pct}%, var(--div-mid))`, strong: t >= 0.7 };
+}

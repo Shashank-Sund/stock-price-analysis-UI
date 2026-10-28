@@ -54,4 +54,22 @@ describe('Analysis tabs', () => {
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
   });
+
+  it('shows the seasonality heatmap with partial months marked', async () => {
+    const user = userEvent.setup();
+    renderDash(SINGLE);
+    await user.click(screen.getByRole('tab', { name: 'Seasonality' }));
+    const table = await screen.findByRole('table', { name: 'AAPL monthly returns by year' });
+    const rows = within(table).getAllByRole('row');
+    expect(rows.map((r) => within(r).queryByRole('rowheader')?.textContent)).toEqual([undefined, '2025', '2026']);
+    expect(within(rows[1]).getByTitle('October 2025: +0.51% (partial month)')).toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: 'AAPL average return by month' })).toHaveAccessibleDescription(/strongest month/);
+  });
+
+  it('explains when there are no full months', async () => {
+    const user = userEvent.setup();
+    renderDash(SHORT);
+    await user.click(screen.getByRole('tab', { name: 'Seasonality' }));
+    expect(await screen.findByText('Needs at least one full calendar month in the range.')).toBeInTheDocument();
+  });
 });

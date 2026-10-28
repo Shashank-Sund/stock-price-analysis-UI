@@ -12,12 +12,14 @@ import { TickerSwitcher } from './TickerSwitcher';
 
 const ReturnsTab = lazy(() => import('./ReturnsTab'));
 const RiskTab = lazy(() => import('./RiskTab'));
+const SeasonalityTab = lazy(() => import('./SeasonalityTab'));
 
-export type TabId = 'returns' | 'risk';
+export type TabId = 'returns' | 'risk' | 'seasonality';
 
 const TABS: { id: TabId; label: string; perTicker: boolean }[] = [
   { id: 'returns', label: 'Returns', perTicker: true },
   { id: 'risk', label: 'Risk', perTicker: true },
+  { id: 'seasonality', label: 'Seasonality', perTicker: true },
 ];
 
 function Loading() {
@@ -69,6 +71,7 @@ export function AnalysisTabs({
         </div>
         {panel('returns', <ReturnsTab ticker={ticker} style={style} />)}
         {panel('risk', <RiskTab ticker={ticker} style={style} interval={data.interval} />)}
+        {panel('seasonality', <SeasonalityTab ticker={ticker} style={style} />)}
       </Tabs>
     </section>
   );

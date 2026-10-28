@@ -1,5 +1,5 @@
 /** Plain text descriptions of the charts, for screen readers and captions. */
-import { formatDate, formatPercent, formatPrice, formatSignedPercent, sign } from './format';
+import { formatDate, formatPercent, formatPrice, formatSignedPercent, MONTHS_LONG, sign } from './format';
 import { extremes } from './transforms';
 import type { TickerData } from './types';
 
@@ -37,4 +37,26 @@ export function drawdownSummary(t: TickerData): string {
   const rec = s.max_drawdown_recovery ? `It got back to the peak on ${formatDate(s.max_drawdown_recovery)}.` : 'It has not recovered to that peak yet.';
   const now = last ? ` At the end of the range it was ${formatSignedPercent(last.value)} from its high.` : '';
   return `The deepest drawdown was ${formatSignedPercent(s.max_drawdown)}, from the peak on ${formatDate(s.max_drawdown_peak)} to the low on ${formatDate(s.max_drawdown_trough)}. ${rec}${now}`;
+}
+
+export function heatmapSummary(t: TickerData): string {
+  const months = t.seasonality.monthly.filter((m) => m.return !== null);
+  if (!months.length) return 'No monthly returns in this range.';
+  const best = months.reduce((a, b) => (b.return! > a.return! ? b : a));
+  const worst = months.reduce((a, b) => (b.return! < a.return! ? b : a));
+  const up = months.filter((m) => m.return! > 0).length;
+  const name = (m: { year: number; month: number }) => `${MONTHS_LONG[m.month - 1]} ${m.year}`;
+  return `${up} of ${months.length} months were positive. The best month was ${name(best)} (${formatSignedPercent(best.return, 1)}), the worst ${name(worst)} (${formatSignedPercent(worst.return, 1)}).`;
+}
+
+export function byMonthSummary(t: TickerData): string {
+  const rows = t.seasonality.by_month.filter((m) => m.average !== null);
+  if (!rows.length) return 'Averages by month need at least one full calendar month in the range.';
+  const best = rows.reduce((a, b) => (b.average! > a.average! ? b : a));
+  const worst = rows.reduce((a, b) => (b.average! < a.average! ? b : a));
+  const yrs = (n: number) => `${n} ${n === 1 ? 'year' : 'years'}`;
+  if (rows.length === 1) {
+    return `Only ${MONTHS_LONG[best.month - 1]} is a full month in this range: ${formatSignedPercent(best.average, 1)}.`;
+  }
+  return `On average ${MONTHS_LONG[best.month - 1]} was the strongest month (${formatSignedPercent(best.average, 1)} over ${yrs(best.years)}) and ${MONTHS_LONG[worst.month - 1]} the weakest (${formatSignedPercent(worst.average, 1)} over ${yrs(worst.years)}).`;
 }

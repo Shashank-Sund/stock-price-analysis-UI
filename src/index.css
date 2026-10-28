@@ -103,8 +103,8 @@
   --down: #e66767;
   --positive: oklch(0.76 0.15 150);
   --negative: oklch(0.74 0.15 22);
-  --div-pos: #3987e5;
-  --div-neg: #d64545;
+  --div-pos: #256abf;
+  --div-neg: #b83232;
   --div-mid: #303036;
   color-scheme: dark;
 }
