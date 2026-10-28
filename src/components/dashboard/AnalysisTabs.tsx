@@ -13,13 +13,15 @@ import { TickerSwitcher } from './TickerSwitcher';
 const ReturnsTab = lazy(() => import('./ReturnsTab'));
 const RiskTab = lazy(() => import('./RiskTab'));
 const SeasonalityTab = lazy(() => import('./SeasonalityTab'));
+const CompareTab = lazy(() => import('./CompareTab'));
 
-export type TabId = 'returns' | 'risk' | 'seasonality';
+export type TabId = 'returns' | 'risk' | 'seasonality' | 'compare';
 
 const TABS: { id: TabId; label: string; perTicker: boolean }[] = [
   { id: 'returns', label: 'Returns', perTicker: true },
   { id: 'risk', label: 'Risk', perTicker: true },
   { id: 'seasonality', label: 'Seasonality', perTicker: true },
+  { id: 'compare', label: 'Compare', perTicker: false },
 ];
 
 function Loading() {
@@ -67,11 +69,22 @@ export function AnalysisTabs({
               </TabsTrigger>
             ))}
           </TabsList>
-          {current.perTicker && <TickerSwitcher view={view} active={active} onChange={onSelect} label="Ticker shown in this tab" />}
+          {current.perTicker ? (
+            <TickerSwitcher view={view} active={active} onChange={onSelect} label="Ticker shown in this tab" />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {view.benchmark
+                ? `${view.tickers.length > 1 ? 'All tickers' : view.tickers[0]} and SPY, the benchmark`
+                : view.userHasBenchmark
+                  ? 'All tickers, with SPY as the benchmark'
+                  : 'All tickers'}
+            </p>
+          )}
         </div>
         {panel('returns', <ReturnsTab ticker={ticker} style={style} />)}
         {panel('risk', <RiskTab ticker={ticker} style={style} interval={data.interval} />)}
         {panel('seasonality', <SeasonalityTab ticker={ticker} style={style} />)}
+        {panel('compare', <CompareTab data={data} view={view} />)}
       </Tabs>
     </section>
   );

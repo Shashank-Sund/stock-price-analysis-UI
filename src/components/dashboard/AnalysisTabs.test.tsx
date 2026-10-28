@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import Dashboard from './Dashboard';
-import { MULTI, SHORT, SINGLE } from '@/test/json-fixtures';
+import { MAX, MULTI, SHORT, SINGLE, WITH_SPY } from '@/test/json-fixtures';
 import type { AnalysisResponse } from '@/lib/types';
 
 const renderDash = (data: AnalysisResponse) =>
@@ -71,5 +71,44 @@ describe('Analysis tabs', () => {
     renderDash(SHORT);
     await user.click(screen.getByRole('tab', { name: 'Seasonality' }));
     expect(await screen.findByText('Needs at least one full calendar month in the range.')).toBeInTheDocument();
+  });
+
+  it('compares one ticker with SPY', async () => {
+    const user = userEvent.setup();
+    renderDash(SINGLE);
+    await user.click(screen.getByRole('tab', { name: 'Compare' }));
+    expect(await screen.findByText('AAPL and SPY, the benchmark')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Ticker shown in this tab' })).not.toBeInTheDocument();
+    const legend = await screen.findByRole('list', { name: 'Legend' });
+    expect(within(legend).getAllByRole('button').map((b) => b.textContent)).toEqual(['AAPL', 'SPY (benchmark)']);
+    const matrix = screen.getByRole('table', { name: /Correlation of daily returns/ });
+    expect(within(matrix).getAllByRole('row')).toHaveLength(3);
+    expect(screen.getByRole('figure', { name: /Percent change since the start/ })).toHaveAccessibleDescription(
+      'AAPL returned +29.5%. SPY, the benchmark, returned +13.2%.',
+    );
+  });
+
+  it('lists SPY once when the user entered it, and hides lines from the legend', async () => {
+    const user = userEvent.setup();
+    renderDash(WITH_SPY);
+    await user.click(screen.getByRole('tab', { name: 'Compare' }));
+    const legend = await screen.findByRole('list', { name: 'Legend' });
+    const buttons = within(legend).getAllByRole('button');
+    expect(buttons.map((b) => b.textContent)).toEqual(['TSLA', 'SPY (benchmark)']);
+    await user.click(buttons[0]);
+    expect(buttons[0]).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('handles 10 tickers over 20 years', async () => {
+    const user = userEvent.setup();
+    renderDash(MAX);
+    await user.click(screen.getByRole('tab', { name: 'Compare' }));
+    const matrix = await screen.findByRole('table', { name: /Correlation of daily returns/ });
+    expect(within(matrix).getAllByRole('row')).toHaveLength(12);
+    // Large gains start on a log axis.
+    const logButtons = screen.getAllByRole('button', { name: 'Log scale' });
+    expect(logButtons[0]).toHaveAttribute('aria-pressed', 'false'); // price chart
+    expect(logButtons[1]).toHaveAttribute('aria-pressed', 'true'); // change since the start
+    expect(screen.getByRole('figure', { name: /Percent change/ })).toHaveAccessibleDescription(/NVDA gained the most \(\+43,525\.0%\) and XOM the least/);
   });
 });
