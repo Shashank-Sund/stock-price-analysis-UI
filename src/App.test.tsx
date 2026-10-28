@@ -4,7 +4,14 @@ import userEvent from '@testing-library/user-event';
 import App from './App';
 import { RECENT_KEY } from '@/lib/recent';
 import { presetRange } from '@/lib/dates';
-import { CRASH_JSON, EDA_ERROR, MULTI_NEW, SINGLE_NEW } from '@/test/fixtures/responses';
+import {
+  CRASH_JSON,
+  ENVELOPE_EDA_ERROR as EDA_ERROR,
+  ENVELOPE_MULTI as MULTI_NEW,
+  ENVELOPE_SINGLE as SINGLE_NEW,
+} from '@/test/fixtures/responses';
+
+// Component tests use the real API Gateway format: a JSON envelope around the HTML.
 
 type Deferred = { resolve: (r: Response) => void; reject: (e: unknown) => void };
 

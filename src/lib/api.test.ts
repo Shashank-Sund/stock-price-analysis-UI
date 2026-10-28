@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { analyze, ApiError, DEFAULT_API_URL, toRequestBody } from './api';
-import { CRASH_JSON, EDA_ERROR, SINGLE_NEW } from '@/test/fixtures/responses';
+import { CRASH_JSON, EDA_ERROR, ENVELOPE_EDA_ERROR, ENVELOPE_SINGLE, SINGLE_NEW } from '@/test/fixtures/responses';
 
 const req = { startDate: '2024-01-01', endDate: '2024-12-31', tickers: ['AAPL', 'MSFT'] };
 
@@ -29,7 +29,19 @@ describe('analyze', () => {
     expect(toRequestBody({ ...req, tickers: ['AAPL'] }).symbol).toBe('AAPL');
   });
 
-  it('returns charts on success', async () => {
+  it('returns charts from the JSON envelope served as text/html', async () => {
+    const fetchImpl = fetchReturning(ENVELOPE_SINGLE, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    expect(await analyze(req, { fetchImpl })).toHaveLength(5);
+  });
+
+  it('throws the eda-error message from the JSON envelope', async () => {
+    await expect(analyze(req, { fetchImpl: fetchReturning(ENVELOPE_EDA_ERROR) })).rejects.toMatchObject({
+      kind: 'server',
+      message: 'No data found for XYZ between 2024-01-01 and 2024-02-01',
+    });
+  });
+
+  it('returns charts on success (bare HTML fallback)', async () => {
     const charts = await analyze(req, { fetchImpl: fetchReturning(SINGLE_NEW) });
     expect(charts).toHaveLength(5);
   });

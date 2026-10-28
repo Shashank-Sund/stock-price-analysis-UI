@@ -1,6 +1,11 @@
 /**
- * Parses the analysis API response body. The backend returns an HTML document whose
- * <body> holds matplotlib charts as base64 PNG <img> tags, or an error marker.
+ * Parses the analysis API response body.
+ *
+ * The production API Gateway integration is non-proxy, so the HTTP body is the Lambda's
+ * return value serialized as JSON: {"statusCode": 200, "body": "<!DOCTYPE html>...", "headers": {...}}.
+ * The HTML in `body` holds matplotlib charts as base64 PNG <img> tags, or an
+ * <div class='eda-error'> marker. A crash returns {"errorMessage", "errorType"} instead.
+ * When the text is not JSON we treat it as HTML directly (local mock, or a future proxy integration).
  *
  * Server HTML is never injected into the page: we parse it with DOMParser (which does
  * not execute scripts) and copy out only the data we trust.

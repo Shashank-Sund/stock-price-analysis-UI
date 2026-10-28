@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 /**
- * Local mock of the Stock Price Analysis API. Mirrors the backend contract:
- * POST JSON {start_date, end_date, symbol} and get back an HTML document whose
- * <body> holds base64 PNG <img> tags (synthetic charts from ./fixtures).
+ * Local mock of the Stock Price Analysis API. Mirrors the production contract:
+ * POST JSON {start_date, end_date, symbol}. Like the real non-proxy API Gateway
+ * integration, the HTTP 200 response text is the Lambda's return value serialized as JSON:
+ *   {"statusCode": 200, "body": "<!DOCTYPE html>...<img src='data:image/png;base64,...' alt='...'>...",
+ *    "headers": {"Content-Type": "text/html"}}
+ * with the HTTP Content-Type header saying text/html. The charts are synthetic (./fixtures).
+ * Set MOCK_FORMAT=html to send the bare HTML document instead (proxy style fallback).
  *
  * Special tickers pick a scenario (case insensitive, anywhere in the symbol list):
- *   ERR      HTTP 200 with <div class="eda-error" role="alert">...</div>
+ *   ERR      HTTP 200 envelope whose body has <div class='eda-error' role='alert'>...</div>
  *   CRASH    HTTP 200 with the old backend crash JSON {"errorMessage", "errorType"}
  *   SLOW     success after 5 seconds
  *   HANG     waits 40 seconds (longer than the client timeout)
@@ -24,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8787);
 const DELAY_MS = Number(process.env.MOCK_DELAY_MS ?? 1200);
+const FORMAT = process.env.MOCK_FORMAT === 'html' ? 'html' : 'envelope';
 
 const png = (name) => readFileSync(join(here, 'fixtures', `${name}.png`)).toString('base64');
 const FIXTURES = {
@@ -38,13 +43,19 @@ const FIXTURES = {
 const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/</g, '&lt;');
 const escapeText = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const page = (body) =>
+const doc = (body) =>
   `<!DOCTYPE html>\n<html>\n<head>\n<title>My Basic HTML Page</title>\n</head>\n<body>${body}</body>\n</html>`;
 
 const img = (f, withAlt) =>
   withAlt
     ? `<img src='data:image/png;base64,${f.b64}' alt='${escapeAttr(f.title)}'>`
     : `<img src='data:image/png;base64,${f.b64}'>`;
+
+/** Wraps an HTML document the way the non-proxy API Gateway integration does. */
+const page = (body) =>
+  FORMAT === 'html'
+    ? doc(body)
+    : JSON.stringify({ statusCode: 200, body: doc(body), headers: { 'Content-Type': 'text/html' } });
 
 function charts(tickers, start, end, withAlt) {
   if (tickers.length > 1) return page(img(FIXTURES.multi, withAlt));
@@ -116,17 +127,17 @@ const server = createServer(async (req, res) => {
     send(res, 500, JSON.stringify({ message: 'Internal server error' }), 'application/json');
   } else if (has('ERR')) {
     const bad = tickers.find((t) => t === 'ERR');
-    send(res, 200, page(`<div class="eda-error" role="alert">${escapeText(`No data found for ${bad} between ${start} and ${end}`)}</div>`));
+    send(res, 200, page(`<div class='eda-error' role='alert'>${escapeText(`No data found for ${bad} between ${start} and ${end}`)}</div>`));
   } else if (has('EMPTY')) {
     send(res, 200, page('<p>Nothing to see here</p>'));
   } else if (tickers.length === 0) {
-    send(res, 200, page('<div class="eda-error" role="alert">Please provide at least one ticker symbol</div>'));
+    send(res, 200, page("<div class='eda-error' role='alert'>Please provide at least one ticker symbol</div>"));
   } else {
     send(res, 200, charts(tickers, start, end, !has('NOALT')));
   }
 });
 
 server.listen(PORT, () => {
-  console.log(`[mock-api] listening on http://localhost:${PORT} (delay ${DELAY_MS} ms)`);
+  console.log(`[mock-api] listening on http://localhost:${PORT} (delay ${DELAY_MS} ms, format ${FORMAT})`);
   console.log('[mock-api] scenarios by ticker: ERR, CRASH, SLOW, HANG, NOALT, EMPTY, HTTP500');
 });

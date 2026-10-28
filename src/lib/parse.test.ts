@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { NO_CHARTS_MESSAGE, parseAnalysisResponse } from './parse';
-import { BLUE_PNG, CRASH_JSON, EDA_ERROR, HOSTILE, MULTI_NEW, RED_PNG, SINGLE_NEW, SINGLE_OLD, dataUrl } from '@/test/fixtures/responses';
+import {
+  BLUE_PNG,
+  CRASH_JSON,
+  EDA_ERROR,
+  ENVELOPE_EDA_ERROR,
+  ENVELOPE_MULTI,
+  ENVELOPE_OLD,
+  ENVELOPE_SINGLE,
+  HOSTILE,
+  MULTI_NEW,
+  RED_PNG,
+  SINGLE_NEW,
+  SINGLE_OLD,
+  dataUrl,
+  envelope,
+} from '@/test/fixtures/responses';
 
 describe('parseAnalysisResponse', () => {
   it('extracts charts with titles from the new format', () => {
@@ -64,9 +79,55 @@ describe('parseAnalysisResponse', () => {
     expect(r).toEqual({ kind: 'error', message: 'The analysis service returned an error: Endpoint request timed out' });
   });
 
-  it('unwraps a proxy envelope whose body is the HTML document', () => {
-    const r = parseAnalysisResponse(JSON.stringify({ statusCode: 200, body: MULTI_NEW }));
-    expect(r.kind === 'charts' && r.charts).toHaveLength(1);
+  describe('non-proxy JSON envelope (the real API Gateway format)', () => {
+    it('extracts charts from the envelope body', () => {
+      const r = parseAnalysisResponse(ENVELOPE_SINGLE);
+      expect(r.kind).toBe('charts');
+      expect(r.kind === 'charts' && r.charts.map((c) => c.title)).toEqual([
+        'Closing Stock Price Over Time',
+        'Closing Stock Prices by Year',
+        'Correlation Between Stock Prices',
+        'Distribution of Closing Stock Price',
+        'Daily Returns',
+      ]);
+      expect(r.kind === 'charts' && r.charts[0].src).toBe(dataUrl(RED_PNG));
+    });
+
+    it('extracts the multi ticker chart from the envelope body', () => {
+      const r = parseAnalysisResponse(ENVELOPE_MULTI);
+      expect(r.kind === 'charts' && r.charts).toEqual([
+        { title: 'Closing Stock Price of Multiple Companies Over Time', src: dataUrl(BLUE_PNG) },
+      ]);
+    });
+
+    it('falls back to "Chart N" inside an envelope without alt attributes', () => {
+      const r = parseAnalysisResponse(ENVELOPE_OLD);
+      expect(r.kind === 'charts' && r.charts.map((c) => c.title)).toEqual(['Chart 1', 'Chart 2', 'Chart 3']);
+    });
+
+    it('reads a single quoted eda-error from the envelope body', () => {
+      expect(parseAnalysisResponse(ENVELOPE_EDA_ERROR)).toEqual({
+        kind: 'error',
+        message: 'No data found for XYZ between 2024-01-01 and 2024-02-01',
+      });
+    });
+
+    it('reads an eda-error even when the envelope statusCode is not 200', () => {
+      const r = parseAnalysisResponse(envelope(EDA_ERROR, 400));
+      expect(r).toEqual({ kind: 'error', message: 'No data found for XYZ between 2024-01-01 and 2024-02-01' });
+    });
+
+    it('reports no charts for an envelope with an empty body', () => {
+      expect(parseAnalysisResponse(envelope(''))).toEqual({ kind: 'error', message: NO_CHARTS_MESSAGE });
+    });
+
+    it('tolerates whitespace around the JSON', () => {
+      expect(parseAnalysisResponse(`\n  ${ENVELOPE_MULTI}  \n`).kind).toBe('charts');
+    });
+  });
+
+  it('falls back to bare HTML when the text is not JSON', () => {
+    expect(parseAnalysisResponse(MULTI_NEW).kind).toBe('charts');
   });
 
   it('keeps only safe base64 PNG data URLs and never executes scripts', () => {

@@ -29,8 +29,20 @@ export const SINGLE_OLD = page(
 );
 
 export const EDA_ERROR = page(
-  `<div class="eda-error" role="alert">No data found for XYZ between 2024-01-01 and 2024-02-01</div>`,
+  `<div class='eda-error' role='alert'>No data found for XYZ between 2024-01-01 and 2024-02-01</div>`,
 );
+
+/**
+ * The real API Gateway integration is non-proxy: the HTTP body is the Lambda's whole
+ * return value serialized as JSON, with the HTML document in `body`.
+ */
+export const envelope = (html: string, statusCode = 200) =>
+  JSON.stringify({ statusCode, body: html, headers: { 'Content-Type': 'text/html' } });
+
+export const ENVELOPE_SINGLE = envelope(SINGLE_NEW);
+export const ENVELOPE_MULTI = envelope(MULTI_NEW);
+export const ENVELOPE_EDA_ERROR = envelope(EDA_ERROR);
+export const ENVELOPE_OLD = envelope(SINGLE_OLD);
 
 export const CRASH_JSON = JSON.stringify({
   errorMessage: "'NoneType' object is not subscriptable",
