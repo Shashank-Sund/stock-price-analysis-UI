@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildPriceRows, extremes, histogramBins, timeRows, timeTicks } from './transforms';
-import { SINGLE } from '@/test/json-fixtures';
+import { buildHeatmap, buildPriceRows, divergingColor, extremes, histogramBins, timeRows, timeTicks } from './transforms';
+import { MAX, SINGLE } from '@/test/json-fixtures';
 
 describe('buildPriceRows', () => {
   it('turns columns into rows with UTC second timestamps', () => {
@@ -77,5 +77,48 @@ describe('timeRows and extremes', () => {
     expect(rows[1]).toEqual({ t: Date.UTC(2025, 0, 3), date: '2025-01-03', v: 0.2 });
     const e = extremes(['a', 'b', 'c'], [null, 0.2, 0.1]);
     expect(e).toEqual({ min: { value: 0.1, date: 'c' }, max: { value: 0.2, date: 'b' }, last: { value: 0.1, date: 'c' } });
+  });
+});
+
+describe('buildHeatmap', () => {
+  const monthly = [
+    { year: 2025, month: 10, return: 0.005, partial: true },
+    { year: 2025, month: 11, return: 0.03, partial: false },
+    { year: 2025, month: 12, return: -0.02, partial: false },
+    { year: 2026, month: 1, return: 0.1, partial: false },
+    { year: 2026, month: 2, return: null, partial: true },
+  ];
+
+  it('places months in a years by months grid', () => {
+    const g = buildHeatmap(monthly);
+    expect(g.rows.map((r) => r.year)).toEqual([2025, 2026]);
+    expect(g.rows[0].cells.slice(0, 9)).toEqual(new Array(9).fill(null));
+    expect(g.rows[0].cells[9]).toEqual({ year: 2025, month: 10, value: 0.005, partial: true });
+    expect(g.rows[1].cells[1]?.value).toBeNull();
+  });
+
+  it('compounds the year total and marks partial years', () => {
+    const g = buildHeatmap(monthly);
+    expect(g.rows[0].total).toBeCloseTo(1.005 * 1.03 * 0.98 - 1, 9);
+    expect(g.rows[0].totalPartial).toBe(true);
+    // A missing month value makes the year total unknown.
+    expect(g.rows[1].total).toBeNull();
+  });
+
+  it('builds the grid for 20 years of real data', () => {
+    const g = buildHeatmap(MAX.series.AAPL.seasonality.monthly);
+    expect(g.rows).toHaveLength(21);
+    expect(g.rows.every((r) => r.cells.length === 12)).toBe(true);
+    expect(g.rows[5].totalPartial).toBe(false);
+    expect(g.scale).toBeGreaterThanOrEqual(0.02);
+  });
+});
+
+describe('divergingColor', () => {
+  it('mixes toward blue above zero and red below, neutral at zero', () => {
+    expect(divergingColor(0.05, 0.1)).toEqual({ background: 'color-mix(in oklch, var(--div-pos) 50%, var(--div-mid))', strong: false });
+    expect(divergingColor(-0.2, 0.1)).toEqual({ background: 'color-mix(in oklch, var(--div-neg) 100%, var(--div-mid))', strong: true });
+    expect(divergingColor(0, 0.1).background).toContain('0%');
+    expect(divergingColor(null, 0.1).background).toBe('var(--muted)');
   });
 });

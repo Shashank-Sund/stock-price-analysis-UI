@@ -8,6 +8,7 @@ import {
   formatRatio,
   formatSignedPercent,
   formatSignedRatio,
+  formatTickPercent,
   MONTHS_SHORT,
   NA,
   sign,
@@ -56,5 +57,11 @@ describe('format', () => {
 
   it('gives the sign of a value', () => {
     expect([sign(2), sign(-1), sign(0), sign(null)]).toEqual([1, -1, 0, 0]);
+  });
+});
+
+describe('formatTickPercent', () => {
+  it('drops the decimal on whole percents', () => {
+    expect([0.15, 0.075, -0.05, 0].map(formatTickPercent)).toEqual(['15%', '7.5%', '-5%', '0%']);
   });
 });

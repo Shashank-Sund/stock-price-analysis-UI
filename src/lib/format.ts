@@ -115,3 +115,9 @@ export function sign(v: Num | undefined): 1 | -1 | 0 {
   if (!isNum(v) || v === 0) return 0;
   return v > 0 ? 1 : -1;
 }
+
+/** Axis tick percentage: "15%" for whole percents, "7.5%" otherwise. */
+export function formatTickPercent(v: number): string {
+  const whole = Math.abs(Math.round(v * 1000) / 10 - Math.round(v * 100)) < 1e-9;
+  return formatPercent(v, whole ? 0 : 1);
+}

@@ -36,6 +36,17 @@ function mediaStore(query: string) {
 }
 
 const reduced = mediaStore('(prefers-reduced-motion: reduce)');
+const stores = new Map<string, ReturnType<typeof mediaStore>>();
+
+/** True while a media query matches. */
+export function useMediaQuery(query: string): boolean {
+  let store = stores.get(query);
+  if (!store) {
+    store = mediaStore(query);
+    stores.set(query, store);
+  }
+  return useSyncExternalStore(store.subscribe, store.get, () => false);
+}
 
 export function useReducedMotion(): boolean {
   return useSyncExternalStore(reduced.subscribe, reduced.get, () => false);
