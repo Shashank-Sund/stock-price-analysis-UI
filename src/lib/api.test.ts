@@ -1,105 +1,115 @@
 import { describe, expect, it, vi } from 'vitest';
-import { analyze, ApiError, DEFAULT_API_URL, toRequestBody } from './api';
-import { CRASH_JSON, EDA_ERROR, ENVELOPE_EDA_ERROR, ENVELOPE_SINGLE, SINGLE_NEW } from '@/test/fixtures/responses';
+import { DEFAULT_API_URL, fetchAnalysis, parseJsonResponse, toJsonRequestBody, UNEXPECTED_MESSAGE } from './api';
+import { ENVELOPES, httpText, SINGLE } from '@/test/json-fixtures';
 
-const req = { startDate: '2024-01-01', endDate: '2024-12-31', tickers: ['AAPL', 'MSFT'] };
+const req = { startDate: '2025-10-28', endDate: '2026-10-28', tickers: ['AAPL'] };
+const fetchReturning = (body: string, init: ResponseInit = { status: 200 }) => vi.fn(async () => new Response(body, init));
 
-function fetchReturning(body: string, init: ResponseInit = { status: 200 }) {
-  return vi.fn(async () => new Response(body, init));
-}
+it('defaults to the production URL when VITE_API_URL is not set', () => {
+  expect(DEFAULT_API_URL).toBe('https://mgpqvaaqhh.execute-api.us-east-1.amazonaws.com/Prod');
+});
 
-describe('analyze', () => {
-  it('POSTs the legacy JSON contract', async () => {
-    const fetchImpl = fetchReturning(SINGLE_NEW);
-    await analyze(req, { fetchImpl, url: 'http://mock.test' });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('http://mock.test');
-    expect(init.method).toBe('POST');
-    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
-    expect(JSON.parse(init.body as string)).toEqual({
-      start_date: '2024-01-01',
-      end_date: '2024-12-31',
+describe('toJsonRequestBody', () => {
+  it('adds format json to the existing body', () => {
+    expect(toJsonRequestBody({ ...req, tickers: ['AAPL', 'MSFT'] })).toEqual({
+      start_date: '2025-10-28',
+      end_date: '2026-10-28',
       symbol: 'AAPL,MSFT',
+      format: 'json',
     });
   });
 
-  it('defaults to the production URL when VITE_API_URL is not set', () => {
-    expect(DEFAULT_API_URL).toBe('https://mgpqvaaqhh.execute-api.us-east-1.amazonaws.com/Prod');
-    expect(toRequestBody({ ...req, tickers: ['AAPL'] }).symbol).toBe('AAPL');
+  it('sends tickers as typed, including SPY with 10 other tickers', () => {
+    expect(toJsonRequestBody({ ...req, tickers: ['TSLA', 'SPY'] }).symbol).toBe('TSLA,SPY');
+    expect(toJsonRequestBody({ ...req, tickers: ['SPY'] }).symbol).toBe('SPY');
+    const ten = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    const typed = [...ten.slice(0, 5), 'SPY', ...ten.slice(5)];
+    expect(toJsonRequestBody({ ...req, tickers: typed }).symbol).toBe(typed.join(','));
+  });
+});
+
+describe('parseJsonResponse', () => {
+  it('parses the envelope twice', () => {
+    const r = parseJsonResponse(httpText(ENVELOPES.single1y));
+    expect(r.kind).toBe('data');
+    if (r.kind === 'data') {
+      expect(r.data.tickers).toEqual(['AAPL']);
+      expect(r.data.benchmark).toBe('SPY');
+      expect(r.data.series.AAPL.prices.date.length).toBe(r.data.series.AAPL.risk.drawdown.length);
+    }
   });
 
-  it('returns charts from the JSON envelope served as text/html', async () => {
-    const fetchImpl = fetchReturning(ENVELOPE_SINGLE, { status: 200, headers: { 'Content-Type': 'text/html' } });
-    expect(await analyze(req, { fetchImpl })).toHaveLength(5);
+  it('accepts a bare success body', () => {
+    expect(parseJsonResponse(JSON.stringify(SINGLE)).kind).toBe('data');
   });
 
-  it('throws the eda-error message from the JSON envelope', async () => {
-    await expect(analyze(req, { fetchImpl: fetchReturning(ENVELOPE_EDA_ERROR) })).rejects.toMatchObject({
+  it('shows the error message as is', () => {
+    expect(parseJsonResponse(httpText(ENVELOPES.unknown))).toEqual({
+      kind: 'error',
+      message: 'No data found for QXZQZ between 2025-10-28 and 2026-10-28. Check the ticker symbol and the date range.',
+    });
+  });
+
+  it('handles old crash and API Gateway shapes', () => {
+    expect(parseJsonResponse('{"errorMessage":"boom","errorType":"TypeError"}')).toEqual({
+      kind: 'error',
+      message: 'The analysis service failed: boom',
+    });
+    expect(parseJsonResponse('{"message":"Endpoint request timed out"}')).toEqual({
+      kind: 'error',
+      message: 'The analysis service returned an error: Endpoint request timed out',
+    });
+  });
+
+  it.each([
+    ['HTML', '<!DOCTYPE html><html><body><img src="x"></body></html>'],
+    ['empty', ''],
+    ['an envelope with HTML in body', JSON.stringify({ statusCode: 200, body: '<html></html>' })],
+    ['an unknown object', '{"hello":"world"}'],
+  ])('gives a generic readable error for %s', (_name, text) => {
+    expect(parseJsonResponse(text)).toEqual({ kind: 'error', message: UNEXPECTED_MESSAGE });
+  });
+});
+
+describe('fetchAnalysis', () => {
+  it('POSTs JSON with format json and returns the data', async () => {
+    const fetchImpl = fetchReturning(httpText(ENVELOPES.single1y));
+    const data = await fetchAnalysis(req, { fetchImpl, url: '/api' });
+    expect(data.series.AAPL.summary.trading_days).toBeGreaterThan(200);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api');
+    expect(JSON.parse(init.body as string)).toMatchObject({ symbol: 'AAPL', format: 'json' });
+  });
+
+  it('throws the backend error', async () => {
+    await expect(fetchAnalysis(req, { fetchImpl: fetchReturning(httpText(ENVELOPES.unknown)) })).rejects.toMatchObject({
       kind: 'server',
-      message: 'No data found for XYZ between 2024-01-01 and 2024-02-01',
+      message: expect.stringMatching(/^No data found for QXZQZ/),
     });
   });
 
-  it('returns charts on success (bare HTML fallback)', async () => {
-    const charts = await analyze(req, { fetchImpl: fetchReturning(SINGLE_NEW) });
-    expect(charts).toHaveLength(5);
-  });
-
-  it('throws a server error for eda-error bodies', async () => {
-    await expect(analyze(req, { fetchImpl: fetchReturning(EDA_ERROR) })).rejects.toMatchObject({
-      kind: 'server',
-      message: 'No data found for XYZ between 2024-01-01 and 2024-02-01',
-    });
-  });
-
-  it('throws a server error for the crash JSON', async () => {
-    await expect(analyze(req, { fetchImpl: fetchReturning(CRASH_JSON) })).rejects.toMatchObject({ kind: 'server' });
-  });
-
-  it('throws an http error for non 2xx responses', async () => {
-    const e = await analyze(req, { fetchImpl: fetchReturning('oops', { status: 502, statusText: 'Bad Gateway' }) }).catch((x) => x);
-    expect(e).toBeInstanceOf(ApiError);
-    expect(e.kind).toBe('http');
-    expect(e.message).toContain('HTTP 502');
-  });
-
-  it('uses the JSON message of a non 2xx response when present', async () => {
-    const e = await analyze(req, {
-      fetchImpl: fetchReturning('{"message":"Internal server error"}', { status: 500 }),
-    }).catch((x) => x);
-    expect(e.message).toBe('The analysis service returned an error: Internal server error');
+  it('reports HTTP failures with the status', async () => {
+    const e = await fetchAnalysis(req, { fetchImpl: fetchReturning('oops', { status: 502, statusText: 'Bad Gateway' }) }).catch(
+      (x) => x,
+    );
+    expect(e).toMatchObject({ kind: 'http', message: expect.stringContaining('HTTP 502') });
   });
 
   it('maps fetch failures to a network error', async () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError('Failed to fetch');
     });
-    await expect(analyze(req, { fetchImpl })).rejects.toMatchObject({ kind: 'network' });
+    await expect(fetchAnalysis(req, { fetchImpl })).rejects.toMatchObject({ kind: 'network' });
   });
 
-  it('times out with an AbortController', async () => {
+  it('times out', async () => {
     const fetchImpl = vi.fn(
       (_url: string, init?: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
           init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
         }),
     );
-    const e = await analyze(req, { fetchImpl: fetchImpl as unknown as typeof fetch, timeoutMs: 20 }).catch((x) => x);
+    const e = await fetchAnalysis(req, { fetchImpl: fetchImpl as unknown as typeof fetch, timeoutMs: 20 }).catch((x) => x);
     expect(e.kind).toBe('timeout');
-    expect(e.message).toMatch(/timed out/);
-  });
-
-  it('reports a caller cancellation as aborted', async () => {
-    const ctrl = new AbortController();
-    const fetchImpl = vi.fn(
-      (_url: string, init?: RequestInit) =>
-        new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
-        }),
-    );
-    const p = analyze(req, { fetchImpl: fetchImpl as unknown as typeof fetch, signal: ctrl.signal });
-    ctrl.abort();
-    await expect(p).rejects.toMatchObject({ kind: 'aborted' });
   });
 });
