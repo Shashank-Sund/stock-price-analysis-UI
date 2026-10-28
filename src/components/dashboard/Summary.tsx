@@ -13,6 +13,7 @@ import {
   formatPercent,
   formatPrice,
   formatRatio,
+  formatSignedPercent,
 } from '@/lib/format';
 import { HINTS } from '@/lib/hints';
 import type { AnalysisResponse, TickerData } from '@/lib/types';
@@ -56,7 +57,11 @@ function benchmarkKpi(t: TickerData, view: DashboardView) {
     );
   }
   return (
-    <Kpi label="Versus SPY" hint={HINTS.vsSpy}>
+    <Kpi
+      label="Versus SPY"
+      hint={HINTS.vsSpy}
+      detail={view.benchmark ? <>SPY returned {formatSignedPercent(view.benchmark.summary.total_return)}</> : undefined}
+    >
       <span className="flex flex-col gap-0.5 text-base sm:text-lg">
         <Pair label="Beta">{formatRatio(t.summary.beta)}</Pair>
         <Pair label="Return vs SPY">

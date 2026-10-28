@@ -116,19 +116,25 @@ export function ChartTooltipContent({
   );
 }
 
-/** HTML legend for a chart; entries are buttons when onToggle is given (show or hide a series). */
+/**
+ * HTML legend for a chart, usable inside or outside ChartContainer (pass `config` outside).
+ * Entries are buttons when onToggle is given (show or hide a series).
+ */
 export function ChartLegend({
   keys,
   hidden,
   onToggle,
   className,
+  config: own,
 }: {
   keys: string[];
   hidden?: Set<string>;
   onToggle?: (key: string) => void;
   className?: string;
+  config?: ChartConfig;
 }) {
-  const { config } = useChart();
+  const ctx = React.useContext(ChartContext);
+  const config = own ?? ctx?.config ?? {};
   return (
     <ul className={cn('flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs', className)} aria-label="Legend">
       {keys.map((k) => {
@@ -138,7 +144,7 @@ export function ChartLegend({
           <span
             aria-hidden="true"
             className={cn('h-0 w-3.5 shrink-0 border-t-[2.5px]', c.dashed && 'border-dashed')}
-            style={{ borderColor: colorVar(k) }}
+            style={{ borderColor: c.color }}
           />
         );
         return (

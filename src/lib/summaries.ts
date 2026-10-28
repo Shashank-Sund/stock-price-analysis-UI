@@ -1,7 +1,7 @@
 /** Plain text descriptions of the charts, for screen readers and captions. */
-import { formatDate, formatPercent, formatPrice, formatSignedPercent, MONTHS_LONG, sign } from './format';
-import { extremes } from './transforms';
-import type { TickerData } from './types';
+import { formatDate, formatPercent, formatPrice, formatRatio, formatSignedPercent, MONTHS_LONG, sign } from './format';
+import { correlationExtremes, extremes, type CorrelationCell } from './transforms';
+import type { AnalysisResponse, RiskReturnPoint, TickerData } from './types';
 
 export function priceSummary(t: TickerData): string {
   const s = t.summary;
@@ -59,4 +59,40 @@ export function byMonthSummary(t: TickerData): string {
     return `Only ${MONTHS_LONG[best.month - 1]} is a full month in this range: ${formatSignedPercent(best.average, 1)}.`;
   }
   return `On average ${MONTHS_LONG[best.month - 1]} was the strongest month (${formatSignedPercent(best.average, 1)} over ${yrs(best.years)}) and ${MONTHS_LONG[worst.month - 1]} the weakest (${formatSignedPercent(worst.average, 1)} over ${yrs(worst.years)}).`;
+}
+
+export function cumulativeSummary(data: AnalysisResponse, symbols: string[], benchmark: string | null): string {
+  const totals = symbols
+    .map((s) => ({ s, v: data.series[s]?.summary.total_return ?? null }))
+    .filter((x): x is { s: string; v: number } => x.v !== null && x.s !== benchmark);
+  const parts: string[] = [];
+  if (totals.length > 1) {
+    const best = totals.reduce((a, b) => (b.v > a.v ? b : a));
+    const worst = totals.reduce((a, b) => (b.v < a.v ? b : a));
+    parts.push(`${best.s} gained the most (${formatSignedPercent(best.v, 1)}) and ${worst.s} the least (${formatSignedPercent(worst.v, 1)}).`);
+  } else if (totals.length === 1) {
+    parts.push(`${totals[0].s} returned ${formatSignedPercent(totals[0].v, 1)}.`);
+  }
+  if (benchmark && data.series[benchmark]) {
+    parts.push(`SPY, the benchmark, returned ${formatSignedPercent(data.series[benchmark].summary.total_return, 1)}.`);
+  }
+  return parts.join(' ') || 'No returns to compare.';
+}
+
+export function correlationSummary(grid: { symbols: string[]; rows: CorrelationCell[][] }): string {
+  const { hi, lo } = correlationExtremes(grid);
+  if (!hi || !lo) return 'Not enough overlapping trading days to measure correlation.';
+  if (hi === lo) return `The correlation of ${hi.row} and ${hi.col} daily returns was ${formatRatio(hi.value)}.`;
+  return `The most closely linked pair was ${hi.row} and ${hi.col} (${formatRatio(hi.value)}); the least, ${lo.row} and ${lo.col} (${formatRatio(lo.value)}).`;
+}
+
+export function riskReturnSummary(points: RiskReturnPoint[]): string {
+  const ok = points.filter((p) => p.annual_return !== null && p.annual_volatility !== null);
+  if (!ok.length) return 'No risk and return figures to plot.';
+  const by = (k: 'annual_return' | 'annual_volatility' | 'sharpe') =>
+    ok.filter((p) => p[k] !== null).reduce((a, b) => ((b[k] as number) > (a[k] as number) ? b : a), ok[0]);
+  const r = by('annual_return');
+  const v = by('annual_volatility');
+  const s = by('sharpe');
+  return `Highest annual return: ${r.symbol} (${formatSignedPercent(r.annual_return, 1)}). Most volatile: ${v.symbol} (${formatPercent(v.annual_volatility, 1)}). Best Sharpe ratio: ${s.symbol} (${formatRatio(s.sharpe)}).`;
 }

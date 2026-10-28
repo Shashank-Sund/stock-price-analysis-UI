@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { buildHeatmap, buildPriceRows, divergingColor, extremes, histogramBins, timeRows, timeTicks } from './transforms';
-import { MAX, SINGLE } from '@/test/json-fixtures';
+import {
+  buildHeatmap,
+  buildPriceRows,
+  compareRows,
+  correlationExtremes,
+  correlationGrid,
+  divergingColor,
+  extremes,
+  histogramBins,
+  logGrowthTicks,
+  niceTicks,
+  placeLabels,
+  timeRows,
+  timeTicks,
+} from './transforms';
+import { MAX, MULTI, SINGLE } from '@/test/json-fixtures';
 
 describe('buildPriceRows', () => {
   it('turns columns into rows with UTC second timestamps', () => {
@@ -120,5 +134,45 @@ describe('divergingColor', () => {
     expect(divergingColor(-0.2, 0.1)).toEqual({ background: 'color-mix(in oklch, var(--div-neg) 100%, var(--div-mid))', strong: true });
     expect(divergingColor(0, 0.1).background).toContain('0%');
     expect(divergingColor(null, 0.1).background).toBe('var(--muted)');
+  });
+});
+
+describe('compare transforms', () => {
+  it('builds cumulative rows and keeps nulls where a ticker has no bar', () => {
+    const rows = compareRows(MAX.compare, ['META', 'SPY']);
+    expect(rows).toHaveLength(MAX.compare.cumulative_return.date.length);
+    expect(rows[0].META).toBeNull();
+    expect(rows[0].SPY).not.toBeNull();
+    const growth = compareRows(MAX.compare, ['SPY'], true);
+    expect(growth.at(-1)!.SPY).toBeCloseTo(1 + (MAX.compare.cumulative_return.values.SPY.at(-1) as number), 9);
+  });
+
+  it('orders the correlation grid by the given symbols and finds the extremes', () => {
+    const g = correlationGrid(MULTI.compare, ['NVDA', 'AAPL', 'SPY', 'NOPE']);
+    expect(g.symbols).toEqual(['NVDA', 'AAPL', 'SPY']);
+    expect(g.rows[0][0].value).toBe(1);
+    expect(g.rows[0][1]).toEqual({ row: 'NVDA', col: 'AAPL', value: g.rows[1][0].value });
+    const { hi, lo } = correlationExtremes(g);
+    expect(hi!.value!).toBeGreaterThanOrEqual(lo!.value!);
+    expect(hi!.row).not.toBe(hi!.col);
+  });
+
+  it('makes round ticks', () => {
+    expect(niceTicks(0, 0.38, 4)).toEqual([0, 0.1, 0.2, 0.3, 0.4]);
+    expect(niceTicks(-0.012, 0.3)).toEqual([-0.1, 0, 0.1, 0.2, 0.3]);
+    expect(logGrowthTicks(0.6, 450)).toEqual([0.5, 1, 2, 4, 11, 31, 101, 301, 1001]);
+    expect(logGrowthTicks(1.2, 3)).toEqual([1, 2, 4]);
+  });
+
+  it('moves a scatter label away from a nearby dot', () => {
+    const sides = placeLabels(
+      [
+        { x: 0.2, y: 0.1, width: 30 },
+        { x: 0.21, y: 0.1, width: 30 },
+      ],
+      { width: 500, height: 250 },
+      { x: [0, 0.6], y: [0, 0.4] },
+    );
+    expect(sides[0]).not.toBe('right');
   });
 });

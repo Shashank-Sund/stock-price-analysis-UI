@@ -46,10 +46,11 @@ export function buildView(data: AnalysisResponse, query?: AnalysisRequest | null
   const userHasBenchmark = benchKey !== null && tickers.includes(benchKey);
   const benchmark = benchKey && !userHasBenchmark ? (data.series[benchKey] ?? null) : null;
 
+  // SPY always looks like the benchmark (gray, dashed), even when the user entered it,
+  // and does not use up a categorical slot.
   const styles: Record<string, SeriesStyle> = {};
-  tickers.forEach((t, i) => {
-    styles[t] = tickerStyle(i);
-  });
+  let slot = 0;
+  for (const t of tickers) styles[t] = t === benchKey ? BENCHMARK_STYLE : tickerStyle(slot++);
   if (benchmark) styles[benchmark.symbol] = BENCHMARK_STYLE;
 
   return {

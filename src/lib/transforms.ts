@@ -1,6 +1,6 @@
 /** Pure data transforms from the API shapes to chart friendly rows. */
 import { dateToMs } from './format';
-import type { Histogram, Num, Prices } from './types';
+import type { Compare, Histogram, Num, Prices } from './types';
 
 export interface PriceRow {
   date: string;
@@ -193,4 +193,115 @@ export function divergingColor(value: Num, scale: number): { background: string;
   const pct = Math.round(t * 100);
   const pole = value >= 0 ? 'var(--div-pos)' : 'var(--div-neg)';
   return { background: `color-mix(in oklch, ${pole} ${pct}%, var(--div-mid))`, strong: t >= 0.7 };
+}
+
+// ---------------------------------------------------------------------------
+// Compare
+
+/** Cumulative return rows for the given symbols; `growth` turns returns into growth of 1 (for a log axis). */
+export function compareRows(c: Compare, symbols: string[], growth = false): TimePoint[] {
+  const cols: Record<string, Num[]> = {};
+  for (const s of symbols) {
+    const v = c.cumulative_return.values[s];
+    if (v) cols[s] = growth ? v.map((x) => (x === null ? null : 1 + x)) : v;
+  }
+  return timeRows(c.cumulative_return.date, cols);
+}
+
+export interface CorrelationCell {
+  row: string;
+  col: string;
+  value: Num;
+}
+
+/** Correlation matrix as rows of cells, limited to (and ordered by) the given symbols. */
+export function correlationGrid(c: Compare, symbols: string[]): { symbols: string[]; rows: CorrelationCell[][] } {
+  const idx = new Map(c.correlation.symbols.map((s, i) => [s, i]));
+  const keep = symbols.filter((s) => idx.has(s));
+  return {
+    symbols: keep,
+    rows: keep.map((r) => keep.map((col) => ({ row: r, col, value: c.correlation.matrix[idx.get(r)!]?.[idx.get(col)!] ?? null }))),
+  };
+}
+
+/** The most and least correlated distinct pairs. */
+export function correlationExtremes(grid: { symbols: string[]; rows: CorrelationCell[][] }) {
+  let hi: CorrelationCell | null = null;
+  let lo: CorrelationCell | null = null;
+  grid.rows.forEach((row, i) =>
+    row.forEach((cell, j) => {
+      if (j >= i || cell.value === null) return;
+      if (!hi || cell.value > hi.value!) hi = cell;
+      if (!lo || cell.value < lo.value!) lo = cell;
+    }),
+  );
+  return { hi: hi as CorrelationCell | null, lo: lo as CorrelationCell | null };
+}
+
+/** Round tick values (steps of 1, 2, 2.5 or 5 times a power of ten) covering [min, max]. */
+export function niceTicks(min: number, max: number, count = 5): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [];
+  if (max === min) {
+    max = min + 1;
+  }
+  const raw = (max - min) / count;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw) ?? 10 * pow;
+  const start = Math.floor(min / step + 1e-9) * step;
+  const end = Math.ceil(max / step - 1e-9) * step;
+  const out: number[] = [];
+  for (let v = start; v <= end + step / 2; v += step) out.push(Number((Math.round(v / step) * step).toFixed(10)));
+  return out;
+}
+
+export type LabelSide = 'right' | 'left' | 'top' | 'bottom';
+
+/**
+ * Picks a side for each scatter label so labels do not overlap each other or other dots.
+ * Works in pixels of the plot area; `width` is the label text width estimate.
+ */
+export function placeLabels(
+  points: { x: number; y: number; width: number }[],
+  plot: { width: number; height: number },
+  domain: { x: [number, number]; y: [number, number] },
+): LabelSide[] {
+  const px = (p: { x: number; y: number }) => ({
+    x: ((p.x - domain.x[0]) / (domain.x[1] - domain.x[0] || 1)) * plot.width,
+    y: plot.height - ((p.y - domain.y[0]) / (domain.y[1] - domain.y[0] || 1)) * plot.height,
+  });
+  const dots = points.map(px);
+  const h = 14;
+  const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  const hit = (a: { x0: number; x1: number; y0: number; y1: number }, b: typeof a) =>
+    a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+  return points.map((p, i) => {
+    const d = dots[i];
+    const boxes: Record<LabelSide, { x0: number; x1: number; y0: number; y1: number }> = {
+      right: { x0: d.x + 8, x1: d.x + 8 + p.width, y0: d.y - h / 2, y1: d.y + h / 2 },
+      left: { x0: d.x - 8 - p.width, x1: d.x - 8, y0: d.y - h / 2, y1: d.y + h / 2 },
+      top: { x0: d.x - p.width / 2, x1: d.x + p.width / 2, y0: d.y - 8 - h, y1: d.y - 8 },
+      bottom: { x0: d.x - p.width / 2, x1: d.x + p.width / 2, y0: d.y + 8, y1: d.y + 8 + h },
+    };
+    const sides: LabelSide[] = ['right', 'left', 'top', 'bottom'];
+    const inside = (b: (typeof boxes)['right']) => b.x0 >= -4 && b.x1 <= plot.width + 20 && b.y0 >= -16 && b.y1 <= plot.height;
+    const clear = (b: (typeof boxes)['right']) =>
+      !placed.some((q) => hit(b, q)) && !dots.some((o, j) => j !== i && hit(b, { x0: o.x - 5, x1: o.x + 5, y0: o.y - 5, y1: o.y + 5 }));
+    const side = sides.find((s) => inside(boxes[s]) && clear(boxes[s])) ?? sides.find((s) => inside(boxes[s])) ?? 'right';
+    placed.push(boxes[side]);
+    return side;
+  });
+}
+
+const LOG_RETURN_TICKS = [-0.9, -0.75, -0.5, 0, 1, 3, 10, 30, 100, 300, 1000, 3000, 10000];
+
+/** Ticks for a log axis of growth (1 + return), at round returns such as 0%, 100%, 300%, 1K%. */
+export function logGrowthTicks(minGrowth: number, maxGrowth: number): number[] {
+  // From the largest tick at or below the data to the smallest at or above it, so nothing is clipped.
+  const all = LOG_RETURN_TICKS.map((r) => 1 + r);
+  let lo = 0;
+  while (lo + 1 < all.length && all[lo + 1] <= minGrowth) lo++;
+  let hi = all.length - 1;
+  while (hi - 1 >= 0 && all[hi - 1] >= maxGrowth) hi--;
+  const t = all.slice(lo, hi + 1);
+  return t.length >= 2 ? t : [minGrowth, maxGrowth];
 }

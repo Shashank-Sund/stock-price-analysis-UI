@@ -118,6 +118,8 @@ export function sign(v: Num | undefined): 1 | -1 | 0 {
 
 /** Axis tick percentage: "15%" for whole percents, "7.5%" otherwise. */
 export function formatTickPercent(v: number): string {
+  // 1,000% and up: compact, "40K%".
+  if (Math.abs(v) >= 10) return `${nf({ notation: 'compact', maximumFractionDigits: 1 }).format(v * 100)}%`;
   const whole = Math.abs(Math.round(v * 1000) / 10 - Math.round(v * 100)) < 1e-9;
   return formatPercent(v, whole ? 0 : 1);
 }
