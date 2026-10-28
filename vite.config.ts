@@ -39,6 +39,18 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Name the lazily loaded chart libraries' chunks after the libraries.
+        manualChunks(id) {
+          if (/node_modules\/(lightweight-charts|fancy-canvas)\//.test(id)) return 'lightweight-charts';
+          if (/node_modules\/(recharts|d3-[a-z-]+|victory-vendor|@reduxjs|redux|redux-thunk|react-redux|immer|reselect|es-toolkit|decimal\.js-light|eventemitter3|internmap|tiny-invariant|use-sync-external-store)\//.test(id)) {
+            return 'recharts';
+          }
+          return undefined;
+        },
+      },
+    },
   },
   test: {
     globals: true,

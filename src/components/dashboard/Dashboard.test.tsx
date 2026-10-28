@@ -28,7 +28,7 @@ describe('Dashboard summary', () => {
 
   it('shows a table with an SPY row for several tickers', () => {
     renderDash(MULTI);
-    const table = screen.getByRole('table');
+    const table = screen.getByRole('table', { name: /summary statistics/i });
     const rows = within(table).getAllByRole('row');
     expect(rows.map((r) => within(r).queryByRole('rowheader')?.textContent ?? '')).toEqual([
       '',
@@ -53,7 +53,7 @@ describe('Dashboard summary', () => {
 
   it('shows SPY once when the user entered it', () => {
     renderDash(WITH_SPY);
-    const table = screen.getByRole('table');
+    const table = screen.getByRole('table', { name: /summary statistics/i });
     expect(within(table).getAllByText('SPY')).toHaveLength(1);
     expect(within(table).queryByText('Benchmark')).not.toBeInTheDocument();
   });

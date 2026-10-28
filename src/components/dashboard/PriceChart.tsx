@@ -14,6 +14,7 @@ import {
   LineSeries,
   LineStyle,
   PriceScaleMode,
+  TickMarkType,
   type IChartApi,
   type ISeriesApi,
   type MouseEventParams,
@@ -56,6 +57,9 @@ interface SeriesRefs {
   volume: ISeriesApi<'Histogram'>;
 }
 
+const MONTH = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
+const DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
 const FONT = "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 export default function PriceChart({ series, style, interval, mode, showSma50, showSma200, logScale = false, ref }: PriceChartProps) {
@@ -85,7 +89,19 @@ export default function PriceChart({ series, style, interval, mode, showSma50, s
       },
       crosshair: { mode: CrosshairMode.Magnet },
       rightPriceScale: { scaleMargins: { top: 0.08, bottom: 0.06 } },
-      timeScale: { fixLeftEdge: true, fixRightEdge: true, rightOffset: 0, borderVisible: true },
+      timeScale: {
+        fixLeftEdge: true,
+        fixRightEdge: true,
+        rightOffset: 0,
+        borderVisible: true,
+        // Years and months only; a lone day number ("23") reads like a value.
+        tickMarkFormatter: (t: number, type: TickMarkType) => {
+          const d = new Date(t * 1000);
+          if (type === TickMarkType.Year) return String(d.getUTCFullYear());
+          if (type === TickMarkType.Month) return MONTH.format(d);
+          return DAY.format(d);
+        },
+      },
       // Let the page scroll vertically on touch screens; horizontal drags pan the chart.
       handleScroll: { vertTouchDrag: false },
     });
